@@ -5,7 +5,7 @@ import { Ray } from "./Ray.js";
 // as an array of Sphere objects
 function parseSpheres(input, spheres) {
   // remove empty lines and spaces
-  input = input.replace(/^\n+|\n+$|\n(?=\n)|\s/g, "");
+  input = input.replace(/^\n+|\n+$|\n(?=\n)| /g, "");
   // throw error if empty input
   if (input.trim().length == 0) {
     throw "Empty input";
@@ -39,19 +39,49 @@ function render() {
   var spheres = [];
   parseSpheres(input, spheres);
 
-  // for each pixel, generate a ray
+  // for each pixel, cast a ray
   var canvas = document.getElementById("rendered-image");
+  var ctx = canvas.getContext("2d");
   for (var i = 0; i < canvas.width; i++) {
     for (var j = 0; j < canvas.height; j++) {
       var ray = new Ray(i, j);
+
+      // determine the closest intersecting sphere
+      var tMin = Infinity;
+      var closest = null;
+      for (var k = 0; k < spheres.length; k++) {
+        var t = spheres[k].intersects(ray);
+        // intersects, not behind the eye, and the closest
+        if (t != null && t > 0 && t < tMin) {
+          closest = spheres[k];
+          tMin = t;
+        }
+      }
+
+      // color the pixel with the color of the closest intersecting sphere
+      //var pixel = ctx.createImageData(1, 1);
+      if (closest == null) { // no intersecting sphere
+        ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
+        /*
+        pixel.data[0] = 255;
+        pixel.data[1] = 255;
+        pixel.data[2] = 255;
+        pixel.data[3] = 255;
+        */
+      } else {
+        ctx.fillStyle = "rgb(" + closest.r + ", " + closest.g + "," +
+                             closest.b + ")";
+        /*
+        pixel.data[0] = closest.r;
+        pixel.data[1] = closest.g;
+        pixel.data[2] = closest.b;
+        pixel.data[3] = 255;
+        */
+      }
+      ctx.fillRect(i, canvas.height - 1 - j, 1, 1);
+      //ctx.putImageData(pixel, i, canvas.height - 1 - j);
     }
   }
-
-  // color the center pixel with the color of the first parsed sphere
-  var ctx = canvas.getContext("2d");
-  ctx.fillStyle = "rgb(" + spheres[0].r + ", " + spheres[0].g + "," +
-                       spheres[0].b + ")";
-  ctx.fillRect(canvas.width / 2, canvas.height / 2, 1, 1);
 }
 
 var submitButton = document.getElementById("submit-button");

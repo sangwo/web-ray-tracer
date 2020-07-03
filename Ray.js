@@ -3,8 +3,8 @@ const { vec3 } = glMatrix;
 
 const l = -2;   // position of the left edge of the image
 const r = 2;    // position of the right edge of the image
-const b = -1;   // position of the bottom edge of the image
-const t = 1;    // position of the top edge of the image
+const b = -2;   // position of the bottom edge of the image
+const t = 2;    // position of the top edge of the image
 const nx = 500; // canvas width
 const ny = 500; // canvas height
 const d = 1;    // distance from origin to the image
