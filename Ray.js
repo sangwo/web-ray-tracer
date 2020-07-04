@@ -18,4 +18,11 @@ export class Ray {
     this.origin = vec3.fromValues(0, 0, 0);
     this.direction = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
   }
+
+  // Given the t value, return the point on the ray as a vec3 object
+  pointAtParameter(t) {
+    // p(t) = e + td
+    return vec3.add(vec3.create(), this.origin, vec3.scale(vec3.create(),
+        this.direction, t));
+  }
 }

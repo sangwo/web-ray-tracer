@@ -14,10 +14,15 @@ export class Sphere {
     this.b = b;
   }
 
+  // return the center of the sphere as a vec3 object
+  get center() {
+    return vec3.fromValues(this.x, this.y, this.z);
+  }
+
   // Given a Ray object, return the t value for the intersection (null if the
   // ray doesn’t intersect the sphere)
   intersects(ray) {
-    var oc = vec3.subtract(vec3.create(), ray.origin, vec3.fromValues(this.x, this.y, this.z));
+    var oc = vec3.subtract(vec3.create(), ray.origin, this.center);
     var a = vec3.dot(ray.direction, ray.direction);
     var b = 2 * vec3.dot(ray.direction, oc);
     var c = vec3.dot(oc, oc) - this.radius * this.radius;

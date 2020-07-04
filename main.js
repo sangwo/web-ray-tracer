@@ -1,3 +1,4 @@
+const { vec3 } = glMatrix;
 import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 
@@ -34,6 +35,8 @@ function parseSpheres(input, spheres) {
 
 // render the volume on the image
 function render() {
+  const light = vec3.fromValues(0, 5, -2);
+
   // parse input data into spheres
   var input = document.getElementById("spheres-data").value;
   var spheres = [];
@@ -58,28 +61,23 @@ function render() {
         }
       }
 
-      // color the pixel with the color of the closest intersecting sphere
-      //var pixel = ctx.createImageData(1, 1);
-      if (closest == null) { // no intersecting sphere
-        ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
-        /*
-        pixel.data[0] = 255;
-        pixel.data[1] = 255;
-        pixel.data[2] = 255;
-        pixel.data[3] = 255;
-        */
+      // color the pixel, adding Lambertian shading
+      if (tMin != Infinity) {
+        var point = ray.pointAtParameter(tMin);
+        var normal = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(),
+            point, closest.center));
+        var l = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(),
+            light, point));
+
+        // 1 = light intensity (255, 255, 255) scaled out of 1
+        var r = closest.r * 1 * Math.max(0, vec3.dot(normal, l));
+        var g = closest.g * 1 * Math.max(0, vec3.dot(normal, l));
+        var b = closest.b * 1 * Math.max(0, vec3.dot(normal, l));
+        ctx.fillStyle = "rgb(" + r + ", " + g + ", " + b + ")";
       } else {
-        ctx.fillStyle = "rgb(" + closest.r + ", " + closest.g + "," +
-                             closest.b + ")";
-        /*
-        pixel.data[0] = closest.r;
-        pixel.data[1] = closest.g;
-        pixel.data[2] = closest.b;
-        pixel.data[3] = 255;
-        */
+        ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
       }
       ctx.fillRect(i, canvas.height - 1 - j, 1, 1);
-      //ctx.putImageData(pixel, i, canvas.height - 1 - j);
     }
   }
 }
