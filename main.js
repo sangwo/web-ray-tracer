@@ -35,7 +35,7 @@ function parseSpheres(input, spheres) {
 
 // render the volume on the image
 function render() {
-  const light = vec3.fromValues(0, 5, -2);
+  var light = vec3.fromValues(0, 1, -0.5);
 
   // parse input data into spheres
   var input = document.getElementById("spheres-data").value;
@@ -61,19 +61,40 @@ function render() {
         }
       }
 
-      // color the pixel, adding Lambertian shading
+      // color the pixel
       if (tMin != Infinity) {
         var point = ray.pointAtParameter(tMin);
         var normal = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(),
             point, closest.center));
-        var l = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(),
-            light, point));
+        var lightDirection = vec3.normalize(vec3.create(),
+            vec3.subtract(vec3.create(), light, point));
 
-        // 1 = light intensity (255, 255, 255) scaled out of 1
-        var r = closest.r * 1 * Math.max(0, vec3.dot(normal, l));
-        var g = closest.g * 1 * Math.max(0, vec3.dot(normal, l));
-        var b = closest.b * 1 * Math.max(0, vec3.dot(normal, l));
-        ctx.fillStyle = "rgb(" + r + ", " + g + ", " + b + ")";
+        // diffuse (Lambertian shading)
+        var lightIntensity = 1;
+        var diffuse = [
+          closest.r * lightIntensity * Math.max(0, vec3.dot(normal,
+              lightDirection)), // r
+          closest.g * lightIntensity * Math.max(0, vec3.dot(normal,
+              lightDirection)), // g
+          closest.b * lightIntensity * Math.max(0, vec3.dot(normal,
+              lightDirection))  // b
+        ];
+
+        // ambient
+        var ambientLightIntensity = 0.5;
+        var ambient = [
+          closest.r * ambientLightIntensity, // r
+          closest.g * ambientLightIntensity, // g
+          closest.b * ambientLightIntensity  // b
+        ];
+
+        var finalColor = [];
+        for (var c = 0; c < 3; c++) {
+          finalColor[c] = (diffuse[c] + ambient[c]) / 2;
+        }
+
+        ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
+                             finalColor[2] + ")";
       } else {
         ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
       }
