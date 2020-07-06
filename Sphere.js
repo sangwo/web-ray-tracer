@@ -19,6 +19,13 @@ export class Sphere {
     return vec3.fromValues(this.x, this.y, this.z);
   }
 
+  // Given a point and ray direction as vec3 objects, return the normal at the
+  // point as a vec3 object
+  normal(point, rayDirection = null) {
+    return vec3.normalize(vec3.create(), vec3.subtract(vec3.create(), point,
+        this.center));
+  }
+
   // Given a Ray object, return the t value for the intersection (null if the
   // ray doesn’t intersect the sphere)
   intersects(ray) {

@@ -1,10 +1,26 @@
 const { vec3 } = glMatrix;
 import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
+import { Triangle } from "./Triangle.js";
 
-// Given a string of input data and an (empty) array of spheres, parse the input
-// as an array of Sphere objects
-function parseSpheres(input, spheres) {
+// Given an array of tokens and a required number of tokens, throw an error if
+// missing input
+function missingInputError(tokens, required) {
+  if (tokens.length < required) {
+    throw "Missing input";
+  }
+}
+
+// Given color values r, g, b, thrown an error if invalid range
+function invalidColorRangeError(r, g, b) {
+  if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+    throw "Invalid range of r, g, b"
+  }
+}
+
+// Given a string of input data and an (empty) array, parse the input into an
+// array of objects
+function parseObjects(input, objects) {
   // remove empty lines and spaces
   input = input.replace(/^\n+|\n+$|\n(?=\n)| /g, "");
   // throw error if empty input
@@ -15,32 +31,40 @@ function parseSpheres(input, spheres) {
   var lines = input.split("\n");
   for (var i = 0; i < lines.length; i++) {
     var tokens = lines[i].split(",").filter(function(token) {
-      return token != "";
+      return token != ""; // remove empty tokens
     });
 
-    // throw error if missing input
-    if (tokens.length < 7) {
-      throw "Missing input";
+    if (tokens[0] == "s") { // sphere
+      missingInputError(tokens, 8);
+      invalidColorRangeError(tokens[5], tokens[6], tokens[7]);
+      // s, x, y, z, radius, r, g, b
+      objects.push(new Sphere(tokens[1], tokens[2], tokens[3], tokens[4],
+                              tokens[5], tokens[6], tokens[7]));
+    } else if (tokens[0] == "t") { // triangle
+      missingInputError(tokens, 13);
+      invalidColorRangeError(tokens[10], tokens[11], tokens[12]);
+      // t, x0, y0, z0, x1, y1, z1, x2, y2, z2, r, g, b
+      objects.push(new Triangle(
+        vec3.fromValues(tokens[1], tokens[2], tokens[3]), // v0
+        vec3.fromValues(tokens[4], tokens[5], tokens[6]), // v1
+        vec3.fromValues(tokens[7], tokens[8], tokens[9]), // v2
+        tokens[10], tokens[11], tokens[12]) // r, g, b
+      );
+    } else { // no object identifier
+      throw "No object identifier";
     }
-    // throw error if invalid range of r, g, b
-    if (tokens[4] < 0 || tokens[4] > 255 || tokens[5] < 0 || tokens[5] > 255 ||
-        tokens[6] < 0 || tokens[6] > 255) {
-      throw "Invalid range of r, g, b"
-    }
-
-    spheres.push(new Sphere(tokens[0], tokens[1], tokens[2], tokens[3],
-        tokens[4], tokens[5], tokens[6]));
   }
 }
 
 // render the volume on the image
 function render() {
-  var light = vec3.fromValues(0, 1, -0.5);
+  //var light = vec3.fromValues(0, 1, -0.5);
+  var light = vec3.fromValues(0, 0, -0.5);
 
-  // parse input data into spheres
-  var input = document.getElementById("spheres-data").value;
-  var spheres = [];
-  parseSpheres(input, spheres);
+  // parse input data into objects
+  var input = document.getElementById("input-data").value;
+  var objects = [];
+  parseObjects(input, objects);
 
   // for each pixel, cast a ray
   var canvas = document.getElementById("rendered-image");
@@ -49,14 +73,14 @@ function render() {
     for (var j = 0; j < canvas.height; j++) {
       var ray = new Ray(i, j);
 
-      // determine the closest intersecting sphere
+      // determine the closest intersecting object
       var tMin = Infinity;
       var closest = null;
-      for (var k = 0; k < spheres.length; k++) {
-        var t = spheres[k].intersects(ray);
+      for (var k = 0; k < objects.length; k++) {
+        var t = objects[k].intersects(ray);
         // intersects, not behind the eye, and the closest
         if (t != null && t > 0 && t < tMin) {
-          closest = spheres[k];
+          closest = objects[k];
           tMin = t;
         }
       }
@@ -64,28 +88,31 @@ function render() {
       // color the pixel
       if (tMin != Infinity) {
         var point = ray.pointAtParameter(tMin);
-        var normal = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(),
-            point, closest.center));
+        var normal = closest.normal(point, ray.direction);
         var lightDirection = vec3.normalize(vec3.create(),
             vec3.subtract(vec3.create(), light, point));
 
         // diffuse (Lambertian shading)
-        var lightIntensity = 1;
+        var lightIntensity = [255, 255, 255].map(function(x) {
+          return x / 255;
+        });
         var diffuse = [
-          closest.r * lightIntensity * Math.max(0, vec3.dot(normal,
+          closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
               lightDirection)), // r
-          closest.g * lightIntensity * Math.max(0, vec3.dot(normal,
+          closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
               lightDirection)), // g
-          closest.b * lightIntensity * Math.max(0, vec3.dot(normal,
+          closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
               lightDirection))  // b
         ];
 
         // ambient
-        var ambientLightIntensity = 0.5;
+        var ambientLightIntensity = [127.5, 127.5, 127.5].map(function(x) {
+          return x / 255;
+        });
         var ambient = [
-          closest.r * ambientLightIntensity, // r
-          closest.g * ambientLightIntensity, // g
-          closest.b * ambientLightIntensity  // b
+          closest.r * ambientLightIntensity[0], // r
+          closest.g * ambientLightIntensity[1], // g
+          closest.b * ambientLightIntensity[2]  // b
         ];
 
         var finalColor = [];
