@@ -21,7 +21,8 @@ export class Triangle {
     var normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), v0v1,
         v0v2));
     var negNormal = vec3.negate(vec3.create(), normal);
-    var normalAngle = vec3.angle(normal, vec3.negate(vec3.create(), rayDirection));
+    var normalAngle = vec3.angle(normal, vec3.negate(vec3.create(),
+        rayDirection));
     var negNormalAngle = vec3.angle(negNormal, vec3.negate(vec3.create(),
         rayDirection));
     // regardless of order of vertices, normal will always point towards z+
@@ -32,35 +33,41 @@ export class Triangle {
   }
 
   // Given a Ray object, return the t value for the intersection (null if the
-  // ray doesn’t intersect the triangle)
+  // ray doesn’t intersect with the triangle)
   intersects(ray) {
-    var normal = this.normal(null, ray.direction);
+    var E = ray.origin;
+    var D = ray.direction;
+    var a = this.v0[0] - this.v1[0];
+    var b = this.v0[1] - this.v1[1];
+    var c = this.v0[2] - this.v1[2];
+    var d = this.v0[0] - this.v2[0];
+    var e = this.v0[1] - this.v2[1];
+    var f = this.v0[2] - this.v2[2];
+    var g = D[0];
+    var h = D[1];
+    var i = D[2];
+    var j = this.v0[0] - E[0];
+    var k = this.v0[1] - E[1];
+    var l = this.v0[2] - E[2];
 
-    // check if ray and plane are parallel
-    var nDotRayDirection = vec3.dot(normal, ray.direction);
-    if (nDotRayDirection == 0) {
+    var ei_hf = e*i - h*f;
+    var gf_di = g*f - d*i;
+    var dh_eg = d*h - e*g;
+    var ak_jb = a*k - j*b;
+    var jc_al = j*c - a*l;
+    var bl_kc = b*l - k*c;
+    var M = a*ei_hf + b*gf_di + c*dh_eg;
+
+    var beta = (j*ei_hf + k*gf_di + l*dh_eg) / M;
+    var gamma = (i*ak_jb + h*jc_al + g*bl_kc) / M;
+
+    // ray doesn't intersect with triangle
+    if (beta < 0 || gamma < 0 || beta + gamma > 1) {
       return null;
     }
 
-    // compute t
-    var d = vec3.dot(this.v0, normal);
-    var t = (vec3.dot(normal, ray.origin) + d) / nDotRayDirection;
-
-    // check if the point is inside triangle (inside-outside test)
-    var point = ray.pointAtParameter(t);
-    var edge0 = vec3.subtract(vec3.create(), this.v1, this.v0);
-    var edge1 = vec3.subtract(vec3.create(), this.v2, this.v1);
-    var edge2 = vec3.subtract(vec3.create(), this.v0, this.v2);
-    var c0 = vec3.subtract(vec3.create(), point, this.v0);
-    var c1 = vec3.subtract(vec3.create(), point, this.v1);
-    var c2 = vec3.subtract(vec3.create(), point, this.v2);
-
-    if (vec3.dot(normal, vec3.cross(vec3.create(), edge0, c0)) < 0 &&
-        vec3.dot(normal, vec3.cross(vec3.create(), edge1, c1)) < 0 &&
-        vec3.dot(normal, vec3.cross(vec3.create(), edge2, c2)) < 0) {
-      return t;
-    }
-
-    return null;
+    // ray intersects with triangle
+    var t = - (f*ak_jb + e*jc_al + d*bl_kc) / M;
+    return t;
   }
 }

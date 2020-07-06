@@ -58,8 +58,8 @@ function parseObjects(input, objects) {
 
 // render the volume on the image
 function render() {
-  //var light = vec3.fromValues(0, 1, -0.5);
-  var light = vec3.fromValues(0, 0, -0.5);
+  var light = vec3.fromValues(0, 1, -0.5); // top light
+  //var light = vec3.fromValues(0, 0, -0.5); // front light
 
   // parse input data into objects
   var input = document.getElementById("input-data").value;
