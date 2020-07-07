@@ -56,6 +56,38 @@ function parseObjects(input, objects) {
   }
 }
 
+// Given an object, normal to that object, light direction, and an (empty)
+// array, compute the final color and store it in the given array
+function color(closest, normal, lightDirection, finalColor) {
+  // diffuse (Lambertian shading)
+  var lightIntensity = [255, 255, 255].map(function(x) {
+    return x / 255;
+  });
+  var diffuse = [
+    closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
+        lightDirection)), // r
+    closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
+        lightDirection)), // g
+    closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
+        lightDirection))  // b
+  ];
+
+  // ambient
+  var ambientLightIntensity = [127.5, 127.5, 127.5].map(function(x) {
+    return x / 255;
+  });
+  var ambient = [
+    closest.r * ambientLightIntensity[0], // r
+    closest.g * ambientLightIntensity[1], // g
+    closest.b * ambientLightIntensity[2]  // b
+  ];
+
+  // compute final color
+  for (var c = 0; c < 3; c++) {
+    finalColor[c] = (diffuse[c] + ambient[c]) / 2;
+  }
+}
+
 // render the volume on the image
 function render() {
   var light = vec3.fromValues(0, 1, -0.5); // top light
@@ -92,33 +124,8 @@ function render() {
         var lightDirection = vec3.normalize(vec3.create(),
             vec3.subtract(vec3.create(), light, point));
 
-        // diffuse (Lambertian shading)
-        var lightIntensity = [255, 255, 255].map(function(x) {
-          return x / 255;
-        });
-        var diffuse = [
-          closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
-              lightDirection)), // r
-          closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
-              lightDirection)), // g
-          closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
-              lightDirection))  // b
-        ];
-
-        // ambient
-        var ambientLightIntensity = [127.5, 127.5, 127.5].map(function(x) {
-          return x / 255;
-        });
-        var ambient = [
-          closest.r * ambientLightIntensity[0], // r
-          closest.g * ambientLightIntensity[1], // g
-          closest.b * ambientLightIntensity[2]  // b
-        ];
-
         var finalColor = [];
-        for (var c = 0; c < 3; c++) {
-          finalColor[c] = (diffuse[c] + ambient[c]) / 2;
-        }
+        color(closest, normal, lightDirection, finalColor);
 
         ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
                              finalColor[2] + ")";
