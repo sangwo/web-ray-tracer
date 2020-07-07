@@ -56,9 +56,9 @@ function parseObjects(input, objects) {
   }
 }
 
-// Given an object, normal to that object, light direction, and an (empty)
-// array, compute the final color and store it in the given array
-function color(closest, normal, lightDirection, finalColor) {
+// Given an object, normal to that object, light direction, view direction, and
+// an (empty) array, compute the final color and store it in the given array
+function color(closest, normal, lightDirection, viewDirection, finalColor) {
   // diffuse (Lambertian shading)
   var lightIntensity = [255, 255, 255].map(function(x) {
     return x / 255;
@@ -82,9 +82,23 @@ function color(closest, normal, lightDirection, finalColor) {
     closest.b * ambientLightIntensity[2]  // b
   ];
 
+  // specular (Phong shading)
+  var halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
+      viewDirection, lightDirection));
+  var specularColor = [255, 255, 255];
+  var specularLightIntensity = [255, 255, 255].map(function(x) {
+    return x / 255;
+  });
+  var shininess = 50; // Phong exponent
+  var specular = [];
+  for (var c = 0; c < 3; c++) {
+    specular[c] = specularColor[c] * specularLightIntensity[c] *
+        Math.pow(Math.max(0, vec3.dot(normal, halfVector)), shininess);
+  }
+
   // compute final color
   for (var c = 0; c < 3; c++) {
-    finalColor[c] = (diffuse[c] + ambient[c]) / 2;
+    finalColor[c] = (diffuse[c] + ambient[c] + specular[c]) / 3;
   }
 }
 
@@ -123,9 +137,11 @@ function render() {
         var normal = closest.normal(point, ray.direction);
         var lightDirection = vec3.normalize(vec3.create(),
             vec3.subtract(vec3.create(), light, point));
+        var viewDirection = vec3.normalize(vec3.create(),
+            vec3.subtract(vec3.create(), ray.origin, point));
 
         var finalColor = [];
-        color(closest, normal, lightDirection, finalColor);
+        color(closest, normal, lightDirection, viewDirection, finalColor);
 
         ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
                              finalColor[2] + ")";
