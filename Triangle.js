@@ -15,7 +15,7 @@ export class Triangle {
 
   // Given a point and ray direction as vec3 objects, return the normal of the
   // plane containing the triangle as a vec3 object
-  normal(point = null, rayDirection) {
+  normal(point, rayDirection) {
     var v0v1 = vec3.subtract(vec3.create(), this.v1, this.v0);
     var v0v2 = vec3.subtract(vec3.create(), this.v2, this.v0);
     var normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), v0v1,

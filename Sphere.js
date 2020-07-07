@@ -21,7 +21,7 @@ export class Sphere {
 
   // Given a point and ray direction as vec3 objects, return the normal at the
   // point as a vec3 object
-  normal(point, rayDirection = null) {
+  normal(point, rayDirection) {
     return vec3.normalize(vec3.create(), vec3.subtract(vec3.create(), point,
         this.center));
   }

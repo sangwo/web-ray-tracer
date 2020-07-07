@@ -102,6 +102,22 @@ function color(closest, normal, lightDirection, viewDirection, finalColor) {
   }
 }
 
+// Given an array of objects and a Ray object, return the closest object that
+// intersects with the ray
+function closestIntersectObj(objects, ray) {
+  var tMin = Infinity;
+  var closest = null;
+  for (var k = 0; k < objects.length; k++) {
+    var t = objects[k].intersects(ray);
+    // intersects, not behind the eye, and the closest
+    if (t != null && t > 0 && t < tMin) {
+      closest = objects[k];
+      tMin = t;
+    }
+  }
+  return closest;
+}
+
 // render the volume on the image
 function render() {
   var light = vec3.fromValues(0, 1, -0.5); // top light
@@ -120,28 +136,30 @@ function render() {
       var ray = new Ray(i, j);
 
       // determine the closest intersecting object
-      var tMin = Infinity;
-      var closest = null;
-      for (var k = 0; k < objects.length; k++) {
-        var t = objects[k].intersects(ray);
-        // intersects, not behind the eye, and the closest
-        if (t != null && t > 0 && t < tMin) {
-          closest = objects[k];
-          tMin = t;
-        }
-      }
+      var closest = closestIntersectObj(objects, ray);
 
       // color the pixel
-      if (tMin != Infinity) {
-        var point = ray.pointAtParameter(tMin);
+      if (closest != null) { // hit an object
+        var t = closest.intersects(ray);
+        var point = ray.pointAtParameter(t);
         var normal = closest.normal(point, ray.direction);
         var lightDirection = vec3.normalize(vec3.create(),
             vec3.subtract(vec3.create(), light, point));
         var viewDirection = vec3.normalize(vec3.create(),
             vec3.subtract(vec3.create(), ray.origin, point));
 
+        // compute color
         var finalColor = [];
         color(closest, normal, lightDirection, viewDirection, finalColor);
+
+        /*
+        // check if the point is in a shadow
+        var shadowRay = new Ray(point, lightDirection);
+        var shadowObj = closestIntersectObj(objects, shadowRay);
+        if (shadowObj != null) {
+          finalColor.map(function(x) { return 0 * x; }); // black
+        }
+        */
 
         ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
                              finalColor[2] + ")";
@@ -156,7 +174,9 @@ function render() {
 var submitButton = document.getElementById("submit-button");
 submitButton.onclick = function() {
   try {
+    console.time("render"); // TODO: remove
     render();
+    console.timeEnd("render"); // TODO: remove
   } catch(err) {
     alert(err);
   } finally {
