@@ -3,6 +3,15 @@ import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 import { Triangle } from "./Triangle.js";
 
+const light = vec3.fromValues(3, 5, -0.5);
+const l = -2;   // position of the left edge of the image
+const r = 2;    // position of the right edge of the image
+const b = -2;   // position of the bottom edge of the image
+const t = 2;    // position of the top edge of the image
+const nx = 500; // canvas width
+const ny = 500; // canvas height
+const d = 1;    // distance from origin to the image
+
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
 function missingInputError(tokens, required) {
@@ -56,59 +65,13 @@ function parseObjects(input, objects) {
   }
 }
 
-// Given an object, normal to that object, light direction, view direction, and
-// an (empty) array, compute the final color and store it in the given array
-function color(closest, normal, lightDirection, viewDirection, finalColor) {
-  // diffuse (Lambertian shading)
-  var lightIntensity = [255, 255, 255].map(function(x) {
-    return x / 255;
-  });
-  var diffuse = [
-    closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
-        lightDirection)), // r
-    closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
-        lightDirection)), // g
-    closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
-        lightDirection))  // b
-  ];
-
-  // ambient
-  var ambientLightIntensity = [127.5, 127.5, 127.5].map(function(x) {
-    return x / 255;
-  });
-  var ambient = [
-    closest.r * ambientLightIntensity[0], // r
-    closest.g * ambientLightIntensity[1], // g
-    closest.b * ambientLightIntensity[2]  // b
-  ];
-
-  // specular (Phong shading)
-  var halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
-      viewDirection, lightDirection));
-  var specularColor = [255, 255, 255];
-  var specularLightIntensity = [255, 255, 255].map(function(x) {
-    return x / 255;
-  });
-  var shininess = 50; // Phong exponent
-  var specular = [];
-  for (var c = 0; c < 3; c++) {
-    specular[c] = specularColor[c] * specularLightIntensity[c] *
-        Math.pow(Math.max(0, vec3.dot(normal, halfVector)), shininess);
-  }
-
-  // compute final color
-  for (var c = 0; c < 3; c++) {
-    finalColor[c] = (diffuse[c] + ambient[c] + specular[c]) / 3;
-  }
-}
-
 // Given an array of objects and a Ray object, return the closest object that
 // intersects with the ray
 function closestIntersectObj(objects, ray) {
   var tMin = Infinity;
   var closest = null;
   for (var k = 0; k < objects.length; k++) {
-    var t = objects[k].intersects(ray);
+    let t = objects[k].intersects(ray);
     // intersects, not behind the eye, and the closest
     if (t != null && t > 0 && t < tMin) {
       closest = objects[k];
@@ -118,29 +81,84 @@ function closestIntersectObj(objects, ray) {
   return closest;
 }
 
+// Given an object, normal to that object, light direction, and an (empty)
+// array, compute diffuse component (Lambertian shading) and store it in the
+// given array
+function computeDiffuse(closest, normal, lightDirection, arr) {
+  var lightIntensity = [255, 255, 255].map(function(x) {
+    return x / 255;
+  });
+  arr[0] = closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
+      lightDirection)); // r
+  arr[1] = closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
+      lightDirection)); // g
+  arr[2] = closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
+      lightDirection)); // b
+}
+
+// Given an object and an (empty) array, compute ambient component and store it
+// in the given array
+function computeAmbient(closest, arr) {
+  var ambientLightIntensity = [150, 150, 150].map(function(x) {
+    return x / 255;
+  });
+  arr[0] = closest.r * ambientLightIntensity[0]; // r
+  arr[1] = closest.g * ambientLightIntensity[1]; // g
+  arr[2] = closest.b * ambientLightIntensity[2]; // b
+}
+
+// Given normal, view direcion, light direction, and an (empty) array, compute
+// specular component (Phong shading) and store it in the given array
+function computeSpecular(normal, viewDirection, lightDirection, arr) {
+  var halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
+      viewDirection, lightDirection));
+  var specularColor = [255, 255, 255];
+  var specularLightIntensity = [255, 255, 255].map(function(x) {
+    return x / 255;
+  });
+  var shininess = 50; // Phong exponent
+  for (var c = 0; c < 3; c++) {
+    arr[c] = specularColor[c] * specularLightIntensity[c] *
+        Math.pow(Math.max(0, vec3.dot(normal, halfVector)), shininess);
+  }
+}
+
+// Given a point, normal, light direction as vec3 objects and an array of
+// objects, return whether the point is in a shadow
+function isInShadow(point, normal, lightDirection, objects) {
+  var shadowBias = Math.pow(10, -4);
+  var biasedPoint = vec3.add(vec3.create(), point,
+      vec3.scale(vec3.create(), normal, shadowBias));
+  var shadowRay = new Ray(biasedPoint, lightDirection);
+  var shadowObj = closestIntersectObj(objects, shadowRay);
+  return shadowObj != null;
+}
+
 // render the volume on the image
 function render() {
-  var light = vec3.fromValues(0, 1, -0.5); // top light
-  //var light = vec3.fromValues(0, 0, -0.5); // front light
-
   // parse input data into objects
   var input = document.getElementById("input-data").value;
   var objects = [];
   parseObjects(input, objects);
 
-  // for each pixel, cast a ray
+  // for each pixel, cast a ray and color the pixel
   var canvas = document.getElementById("rendered-image");
   var ctx = canvas.getContext("2d");
-  for (var i = 0; i < canvas.width; i++) {
-    for (var j = 0; j < canvas.height; j++) {
-      var ray = new Ray(i, j);
+  for (var i = 0; i < nx; i++) {
+    for (var j = 0; j < ny; j++) {
+      // cast a ray
+      var u = l + (r - l) * (i + 0.5) / nx;
+      var v = b + (t - b) * (j + 0.5) / ny;
+      var rayOrigin = vec3.fromValues(0, 0, 0);
+      var rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
+      var ray = new Ray(rayOrigin, rayDirection);
 
       // determine the closest intersecting object
       var closest = closestIntersectObj(objects, ray);
 
       // color the pixel
       if (closest != null) { // hit an object
-        var t = closest.intersects(ray);
+        let t = closest.intersects(ray);
         var point = ray.pointAtParameter(t);
         var normal = closest.normal(point, ray.direction);
         var lightDirection = vec3.normalize(vec3.create(),
@@ -148,25 +166,23 @@ function render() {
         var viewDirection = vec3.normalize(vec3.create(),
             vec3.subtract(vec3.create(), ray.origin, point));
 
-        // compute color
+        // compute final color
+        var [diffuse, ambient, specular] = [[], [], []];
+        computeDiffuse(closest, normal, lightDirection, diffuse);
+        computeAmbient(closest, ambient);
+        computeSpecular(normal, viewDirection, lightDirection, specular);
+        var shadow = isInShadow(point, normal, lightDirection, objects);
         var finalColor = [];
-        color(closest, normal, lightDirection, viewDirection, finalColor);
-
-        /*
-        // check if the point is in a shadow
-        var shadowRay = new Ray(point, lightDirection);
-        var shadowObj = closestIntersectObj(objects, shadowRay);
-        if (shadowObj != null) {
-          finalColor.map(function(x) { return 0 * x; }); // black
+        for (var c = 0; c < 3; c++) {
+          finalColor[c] = (!shadow * (diffuse[c] + specular[c]) + ambient[c]) / 3;
         }
-        */
 
         ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
                              finalColor[2] + ")";
       } else {
         ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
       }
-      ctx.fillRect(i, canvas.height - 1 - j, 1, 1);
+      ctx.fillRect(i, ny - 1 - j, 1, 1);
     }
   }
 }
@@ -174,11 +190,10 @@ function render() {
 var submitButton = document.getElementById("submit-button");
 submitButton.onclick = function() {
   try {
-    console.time("render"); // TODO: remove
     render();
-    console.timeEnd("render"); // TODO: remove
   } catch(err) {
-    alert(err);
+    //alert(err);
+    console.log(err);
   } finally {
     return false;
   }
