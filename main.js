@@ -11,6 +11,7 @@ const t = 2;    // position of the top edge of the image
 const nx = 500; // canvas width
 const ny = 500; // canvas height
 const d = 8;    // distance from origin to the image
+const samplingWidth = 4; // = sampling height
 
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
@@ -153,41 +154,59 @@ function render() {
   var ctx = canvas.getContext("2d");
   for (var i = 0; i < nx; i++) {
     for (var j = 0; j < ny; j++) {
-      // cast a ray
-      var u = l + (r - l) * (i + 0.5) / nx;
-      var v = b + (t - b) * (j + 0.5) / ny;
-      var rayOrigin = vec3.fromValues(0, 0, 0);
-      var rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
-      var ray = new Ray(rayOrigin, rayDirection);
+      var totalColor = [0, 0, 0]; // r, g, b
 
-      // determine the closest intersecting object
-      var closest = closestIntersectObj(objects, ray);
+      // for each sub-pixel, cast a ray and compute color (supersampling)
+      for (var ic = i; ic < i + 1; ic += (1 / samplingWidth)) {
+        for (var jc = j; jc < j + 1; jc += (1 / samplingWidth)) {
+          // cast a ray
+          var u = l + (r - l) * (ic + (1 / 2 * samplingWidth)) / nx;
+          var v = b + (t - b) * (jc + (1 / 2 * samplingWidth)) / ny;
+          var rayOrigin = vec3.fromValues(0, 0, 0);
+          var rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
+          var ray = new Ray(rayOrigin, rayDirection);
 
-      // color the pixel
-      if (closest != null) { // hit an object
-        let t = closest.intersects(ray);
-        var point = ray.pointAtParameter(t);
-        var normal = closest.normal(point, ray.direction);
-        var lightDirection = vec3.normalize(vec3.create(),
-            vec3.subtract(vec3.create(), light, point));
-        var viewDirection = vec3.normalize(vec3.create(),
-            vec3.subtract(vec3.create(), ray.origin, point));
+          // determine the closest intersecting object
+          var closest = closestIntersectObj(objects, ray);
 
-        // compute final color
-        var diffuse = computeDiffuse(closest, normal, lightDirection);
-        var ambient = computeAmbient(closest);
-        var specular = computeSpecular(normal, viewDirection, lightDirection);
-        var shadow = isInShadow(point, normal, lightDirection, objects);
-        var finalColor = [];
-        for (var c = 0; c < 3; c++) {
-          finalColor[c] = (!shadow * (diffuse[c] + specular[c]) + ambient[c]) / 3;
+          // accumulate color of each sub-pixel
+          if (closest != null) { // hit an object
+            let t = closest.intersects(ray);
+            var point = ray.pointAtParameter(t);
+            var normal = closest.normal(point, ray.direction);
+            var lightDirection = vec3.normalize(vec3.create(),
+                vec3.subtract(vec3.create(), light, point));
+            var viewDirection = vec3.normalize(vec3.create(),
+                vec3.subtract(vec3.create(), ray.origin, point));
+
+            // compute final color
+            var diffuse = computeDiffuse(closest, normal, lightDirection);
+            var ambient = computeAmbient(closest);
+            var specular = computeSpecular(normal, viewDirection, lightDirection);
+            var shadow = isInShadow(point, normal, lightDirection, objects);
+            var finalColor = [];
+            for (let c = 0; c < 3; c++) {
+              finalColor[c] = (!shadow * (diffuse[c] + specular[c]) + ambient[c]) / 3;
+            }
+
+            // accumulate
+            for (let c = 0; c < 3; c++) {
+              totalColor[c] += finalColor[c];
+            }
+          } else { // no intersecting object
+            for (let c = 0; c < 3; c++) {
+              totalColor[c] += 255; // background color (white)
+            }
+          }
         }
-
-        ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
-                             finalColor[2] + ")";
-      } else { // no intersecting object
-        ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
       }
+      // compute average color of the pixel
+      var averageColor = [];
+      for (let c = 0; c < 3; c++) {
+        averageColor[c] = totalColor[c] / (samplingWidth * samplingWidth);
+      }
+      ctx.fillStyle = "rgb(" + averageColor[0] + ", " + averageColor[1] +
+                           ", " + averageColor[2] + ")";
       ctx.fillRect(i, ny - 1 - j, 1, 1);
     }
   }
