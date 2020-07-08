@@ -159,9 +159,9 @@ function render() {
       // for each sub-pixel, cast a ray and compute color (supersampling)
       for (var ic = i; ic < i + 1; ic += (1 / samplingWidth)) {
         for (var jc = j; jc < j + 1; jc += (1 / samplingWidth)) {
-          // cast a ray
-          var u = l + (r - l) * (ic + (1 / 2 * samplingWidth)) / nx;
-          var v = b + (t - b) * (jc + (1 / 2 * samplingWidth)) / ny;
+          // cast a ray (random position within the sub-pixel)
+          var u = l + (r - l) * (ic + (Math.random() / samplingWidth)) / nx;
+          var v = b + (t - b) * (jc + (Math.random() / samplingWidth)) / ny;
           var rayOrigin = vec3.fromValues(0, 0, 0);
           var rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
           var ray = new Ray(rayOrigin, rayDirection);
