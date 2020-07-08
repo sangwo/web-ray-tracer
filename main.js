@@ -27,9 +27,8 @@ function invalidColorRangeError(r, g, b) {
   }
 }
 
-// Given a string of input data and an (empty) array, parse the input into an
-// array of objects
-function parseObjects(input, objects) {
+// Given a string of input data, return an array of parsed objects
+function parseObjects(input) {
   // remove empty lines and spaces
   input = input.replace(/^\n+|\n+$|\n(?=\n)| /g, "");
   // throw error if empty input
@@ -37,6 +36,7 @@ function parseObjects(input, objects) {
     throw "Empty input";
   }
 
+  var objects = [];
   var lines = input.split("\n");
   for (var i = 0; i < lines.length; i++) {
     var tokens = lines[i].split(",").filter(function(token) {
@@ -63,6 +63,8 @@ function parseObjects(input, objects) {
       throw "No object identifier";
     }
   }
+
+  return objects;
 }
 
 // Given an array of objects and a Ray object, return the closest object that
@@ -81,35 +83,39 @@ function closestIntersectObj(objects, ray) {
   return closest;
 }
 
-// Given an object, normal to that object, light direction, and an (empty)
-// array, compute diffuse component (Lambertian shading) and store it in the
-// given array
-function computeDiffuse(closest, normal, lightDirection, arr) {
+// Given an object, normal to that object, and light direction, compute and
+// return diffuse component (Lambertian shading) as an array
+function computeDiffuse(closest, normal, lightDirection) {
   var lightIntensity = [255, 255, 255].map(function(x) {
     return x / 255;
   });
-  arr[0] = closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
-      lightDirection)); // r
-  arr[1] = closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
-      lightDirection)); // g
-  arr[2] = closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
-      lightDirection)); // b
+  var diffuse = [
+    closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
+      lightDirection)), // r
+    closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
+      lightDirection)), // g
+    closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
+      lightDirection))  // b
+  ];
+  return diffuse;
 }
 
-// Given an object and an (empty) array, compute ambient component and store it
-// in the given array
-function computeAmbient(closest, arr) {
+// Given an object, compute and return ambient component as an array
+function computeAmbient(closest) {
   var ambientLightIntensity = [150, 150, 150].map(function(x) {
     return x / 255;
   });
-  arr[0] = closest.r * ambientLightIntensity[0]; // r
-  arr[1] = closest.g * ambientLightIntensity[1]; // g
-  arr[2] = closest.b * ambientLightIntensity[2]; // b
+  var ambient = [
+    closest.r * ambientLightIntensity[0], // r
+    closest.g * ambientLightIntensity[1], // g
+    closest.b * ambientLightIntensity[2]  // b
+  ];
+  return ambient;
 }
 
-// Given normal, view direcion, light direction, and an (empty) array, compute
-// specular component (Phong shading) and store it in the given array
-function computeSpecular(normal, viewDirection, lightDirection, arr) {
+// Given normal, view direcion, and light direction, compute and return specular
+// component (Phong shading) as an array
+function computeSpecular(normal, viewDirection, lightDirection) {
   var halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
       viewDirection, lightDirection));
   var specularColor = [255, 255, 255];
@@ -117,10 +123,12 @@ function computeSpecular(normal, viewDirection, lightDirection, arr) {
     return x / 255;
   });
   var shininess = 50; // Phong exponent
+  var specular = [];
   for (var c = 0; c < 3; c++) {
-    arr[c] = specularColor[c] * specularLightIntensity[c] *
+    specular[c] = specularColor[c] * specularLightIntensity[c] *
         Math.pow(Math.max(0, vec3.dot(normal, halfVector)), shininess);
   }
+  return specular;
 }
 
 // Given a point, normal, light direction as vec3 objects and an array of
@@ -138,8 +146,7 @@ function isInShadow(point, normal, lightDirection, objects) {
 function render() {
   // parse input data into objects
   var input = document.getElementById("input-data").value;
-  var objects = [];
-  parseObjects(input, objects);
+  var objects = parseObjects(input);
 
   // for each pixel, cast a ray and color the pixel
   var canvas = document.getElementById("rendered-image");
@@ -167,10 +174,9 @@ function render() {
             vec3.subtract(vec3.create(), ray.origin, point));
 
         // compute final color
-        var [diffuse, ambient, specular] = [[], [], []];
-        computeDiffuse(closest, normal, lightDirection, diffuse);
-        computeAmbient(closest, ambient);
-        computeSpecular(normal, viewDirection, lightDirection, specular);
+        var diffuse = computeDiffuse(closest, normal, lightDirection);
+        var ambient = computeAmbient(closest);
+        var specular = computeSpecular(normal, viewDirection, lightDirection);
         var shadow = isInShadow(point, normal, lightDirection, objects);
         var finalColor = [];
         for (var c = 0; c < 3; c++) {
