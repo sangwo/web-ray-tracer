@@ -37,10 +37,9 @@ export class Sphere {
 
     if (discriminant < 0) {
       return null;
-    } else {
-      // keep the smaller (closer) value of t
-      var t = (-b - Math.sqrt(discriminant)) / 2*a;
-      return t;
     }
+    // keep the smaller (closer) value of t
+    var t = (-b - Math.sqrt(discriminant)) / 2*a;
+    return t;
   }
 }

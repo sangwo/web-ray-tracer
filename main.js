@@ -3,14 +3,14 @@ import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 import { Triangle } from "./Triangle.js";
 
-const light = vec3.fromValues(3, 5, -0.5);
+const light = vec3.fromValues(0, 2, -12);
 const l = -2;   // position of the left edge of the image
 const r = 2;    // position of the right edge of the image
 const b = -2;   // position of the bottom edge of the image
 const t = 2;    // position of the top edge of the image
 const nx = 500; // canvas width
 const ny = 500; // canvas height
-const d = 1;    // distance from origin to the image
+const d = 8;    // distance from origin to the image
 
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
@@ -126,7 +126,7 @@ function computeSpecular(normal, viewDirection, lightDirection, arr) {
 // Given a point, normal, light direction as vec3 objects and an array of
 // objects, return whether the point is in a shadow
 function isInShadow(point, normal, lightDirection, objects) {
-  var shadowBias = Math.pow(10, -4);
+  var shadowBias = Math.pow(10, -4); // to avoid shadow-acne
   var biasedPoint = vec3.add(vec3.create(), point,
       vec3.scale(vec3.create(), normal, shadowBias));
   var shadowRay = new Ray(biasedPoint, lightDirection);
@@ -179,7 +179,7 @@ function render() {
 
         ctx.fillStyle = "rgb(" + finalColor[0] + ", " + finalColor[1] + ", " +
                              finalColor[2] + ")";
-      } else {
+      } else { // no intersecting object
         ctx.fillStyle = "rgb(255, 255, 255)"; // background color (white)
       }
       ctx.fillRect(i, ny - 1 - j, 1, 1);
@@ -192,8 +192,7 @@ submitButton.onclick = function() {
   try {
     render();
   } catch(err) {
-    //alert(err);
-    console.log(err);
+    alert(err);
   } finally {
     return false;
   }
