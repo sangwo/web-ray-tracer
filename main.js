@@ -2,8 +2,14 @@ const { vec3 } = glMatrix;
 import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 import { Triangle } from "./Triangle.js";
+import { Light } from "./Light.js";
 
-const light = vec3.fromValues(0, 2, -12);
+const light = new Light(
+  vec3.fromValues(-1, 0, -12),    // corner
+  vec3.fromValues(2, 0, 0), 2,    // uvecFull, usteps
+  vec3.fromValues(0, 2, 0), 2,    // vvecFull, vsteps
+  255, 255, 255                   // r, g, b
+);
 const l = -2;   // position of the left edge of the image
 const r = 2;    // position of the right edge of the image
 const b = -2;   // position of the bottom edge of the image
@@ -11,7 +17,7 @@ const t = 2;    // position of the top edge of the image
 const nx = 500; // canvas width
 const ny = 500; // canvas height
 const d = 8;    // distance from origin to the image
-const samplingWidth = 4; // = sampling height
+const samplingWidth = 4; // = sampling height (NxN)
 
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
@@ -87,15 +93,12 @@ function closestIntersectObj(objects, ray) {
 // Given an object, normal to that object, and light direction, compute and
 // return diffuse component (Lambertian shading) as an array
 function computeDiffuse(closest, normal, lightDirection) {
-  var lightIntensity = [255, 255, 255].map(function(x) {
-    return x / 255;
-  });
   var diffuse = [
-    closest.r * lightIntensity[0] * Math.max(0, vec3.dot(normal,
+    closest.r * (light.r / 255) * Math.max(0, vec3.dot(normal,
       lightDirection)), // r
-    closest.g * lightIntensity[1] * Math.max(0, vec3.dot(normal,
+    closest.g * (light.g / 255) * Math.max(0, vec3.dot(normal,
       lightDirection)), // g
-    closest.b * lightIntensity[2] * Math.max(0, vec3.dot(normal,
+    closest.b * (light.b / 255) * Math.max(0, vec3.dot(normal,
       lightDirection))  // b
   ];
   return diffuse;
@@ -123,7 +126,7 @@ function computeSpecular(normal, viewDirection, lightDirection) {
   var specularLightIntensity = [255, 255, 255].map(function(x) {
     return x / 255;
   });
-  var shininess = 50; // Phong exponent
+  var shininess = 300; // Phong exponent
   var specular = [];
   for (var c = 0; c < 3; c++) {
     specular[c] = specularColor[c] * specularLightIntensity[c] *
@@ -133,14 +136,14 @@ function computeSpecular(normal, viewDirection, lightDirection) {
 }
 
 // Given a point, normal, light direction as vec3 objects and an array of
-// objects, return whether the point is in a shadow
+// objects, return 0 if the point is in shadow, 1 otherwise
 function isInShadow(point, normal, lightDirection, objects) {
   var shadowBias = Math.pow(10, -4); // to avoid shadow-acne
   var biasedPoint = vec3.add(vec3.create(), point,
       vec3.scale(vec3.create(), normal, shadowBias));
   var shadowRay = new Ray(biasedPoint, lightDirection);
   var shadowObj = closestIntersectObj(objects, shadowRay);
-  return shadowObj != null;
+  return shadowObj == null;
 }
 
 // render the volume on the image
@@ -174,22 +177,51 @@ function render() {
             let t = closest.intersects(ray);
             var point = ray.pointAtParameter(t);
             var normal = closest.normal(point, ray.direction);
-            var lightDirection = vec3.normalize(vec3.create(),
-                vec3.subtract(vec3.create(), light, point));
             var viewDirection = vec3.normalize(vec3.create(),
                 vec3.subtract(vec3.create(), ray.origin, point));
 
-            // compute final color
-            var diffuse = computeDiffuse(closest, normal, lightDirection);
-            var ambient = computeAmbient(closest);
-            var specular = computeSpecular(normal, viewDirection, lightDirection);
-            var shadow = isInShadow(point, normal, lightDirection, objects);
+            // for each sampling point in area light, compute diffuse, specular,
+            // and shadow and accumulate
+            var ambient = computeAmbient(closest); // independent of light
+            var totalDiffuse = [0, 0, 0];
+            var totalSpecular = [0, 0, 0];
+            var totalShadow = 0;
+            for (var uc = 0; uc < light.usteps; uc++) {
+              for (var vc = 0; vc < light.vsteps; vc++) {
+                var lightPoint = light.pointAt(uc, vc);
+                var lightDirection = vec3.normalize(vec3.create(),
+                    vec3.subtract(vec3.create(), lightPoint, point));
+
+                var diffuse = computeDiffuse(closest, normal, lightDirection);
+                var specular = computeSpecular(normal, viewDirection, lightDirection);
+                var shadow = isInShadow(point, normal, lightDirection, objects);
+
+                // accumulate
+                for (let c = 0; c < 3; c++) {
+                  totalDiffuse[c] += diffuse[c];
+                  totalSpecular[c] += specular[c];
+                }
+                totalShadow += shadow;
+              }
+            }
+            // compute average diffuse, specular, and shadow
+            var averageDiffuse = [];
+            for (let c = 0; c < 3; c++) {
+              averageDiffuse[c] = totalDiffuse[c] / light.samples;
+            }
+            var averageSpecular = [];
+            for (let c = 0; c < 3; c++) {
+              averageSpecular[c] = totalSpecular[c] / light.samples;
+            }
+            var averageShadow = totalShadow / light.samples;
+
+            // compute final color of the sub-pixel
             var finalColor = [];
             for (let c = 0; c < 3; c++) {
-              finalColor[c] = (!shadow * (diffuse[c] + specular[c]) + ambient[c]) / 3;
+              finalColor[c] = (averageShadow * (averageDiffuse[c] + averageSpecular[c]) + ambient[c]) / 3;
             }
 
-            // accumulate
+            // accumulate final colors of sub-pixels
             for (let c = 0; c < 3; c++) {
               totalColor[c] += finalColor[c];
             }
