@@ -28,4 +28,53 @@ export class Light {
         (vc + Math.random() * (vec3.length(this.vvec) / this.vsteps)));
     return vec3.add(vec3.create(), vec3.add(vec3.create(), this.corner, u), v);
   }
+
+  /*
+  // Given a point and ray direction as vec3 objects, return the normal of the
+  // plane containing the (rectangular) area light as a vec3 object
+  normal(point, rayDirection) {
+    var normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(),
+        this.uvec, this.vvec));
+    var negNormal = vec3.negate(vec3.create(), normal);
+    var normalAngle = vec3.angle(normal, vec3.negate(vec3.create(),
+        rayDirection));
+    var negNormalAngle = vec3.angle(negNormal, vec3.negate(vec3.create(),
+        rayDirection));
+    if (normalAngle < negNormalAngle) {
+      return normal;
+    }
+    return negNormal;
+  }
+
+  // Given a Ray object, return the t value for the intersection (null if the
+  // ray doesn’t intersect with the rectangle)
+  intersects(ray) {
+    var normal = this.normal(null, ray.direction);
+
+    // check if ray and plane are parallel (no intersection)
+    var normalDotRayDirection = vec3.dot(normal, ray.direction);
+    if (Math.abs(normalDotRayDirection) < Number.EPSILON) {
+      return null;
+    }
+
+    // compute t
+    var d = vec3.dot(this.corner, normal); // TODO
+    var t = (vec3.dot(normal, ray.origin) + d) / normalDotRayDirection; // TODO
+
+    // check if the point of intersection lies within the rectangle
+    var point = ray.pointAtParameter(t);
+    var cornerPoint = vec3.subtract(vec3.create(), point, this.corner);
+    var uvecUnit = vec3.normalize(vec3.create(), this.uvec);
+    var uProjection = vec3.scale(vec3.create(), uvecUnit, vec3.dot(cornerPoint,
+        uvecUnit));
+    var vProjection = vec3.subtract(vec3.create(), cornerPoint, uProjection);
+    if (vec3.length(uProjection) >= 0 &&
+        vec3.length(uProjection) <= vec3.length(this.uvec) &&
+        vec3.length(vProjection) >= 0 &&
+        vec3.length(vProjection) <= vec3.length(this.vvec)) {
+          return t;
+    }
+    return null;
+  }
+  */
 }

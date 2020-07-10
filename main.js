@@ -18,6 +18,7 @@ const nx = 500; // canvas width
 const ny = 500; // canvas height
 const d = 8;    // distance from origin to the image
 const samplingWidth = 4; // = sampling height (NxN)
+const backgroundColor = [255, 255, 255];
 
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
@@ -106,7 +107,7 @@ function computeDiffuse(closest, normal, lightDirection) {
 
 // Given an object, compute and return ambient component as an array
 function computeAmbient(closest) {
-  var ambientLightIntensity = [150, 150, 150].map(function(x) {
+  var ambientLightIntensity = [255, 255, 255].map(function(x) {
     return x / 255;
   });
   var ambient = [
@@ -146,6 +147,73 @@ function isInShadow(point, normal, lightDirection, objects) {
   return shadowObj == null;
 }
 
+// Given a ray, array of objects, and an array of accumulated color values r, g,
+// b (initialized as 0), accumulate color of sub-pixels
+function castRay(ray, objects, totalColor) {
+  // determine the closest intersecting object
+  var closest = closestIntersectObj(objects, ray);
+
+  // accumulate color of each sub-pixel
+  if (closest != null) { // hit an object
+    let t = closest.intersects(ray);
+    var point = ray.pointAtParameter(t);
+    var normal = closest.normal(point, ray.direction);
+    var viewDirection = vec3.normalize(vec3.create(),
+        vec3.subtract(vec3.create(), ray.origin, point));
+
+    // for each sampling point in area light, compute diffuse, specular, and
+    // shadow and accumulate
+    //var ambient = computeAmbient(closest); // independent of light
+    var totalDiffuse = [0, 0, 0];
+    var totalSpecular = [0, 0, 0];
+    var totalShadow = 0;
+    for (var uc = 0; uc < light.usteps; uc++) {
+      for (var vc = 0; vc < light.vsteps; vc++) {
+        var lightPoint = light.pointAt(uc, vc);
+        var lightDirection = vec3.normalize(vec3.create(),
+            vec3.subtract(vec3.create(), lightPoint, point));
+
+        var diffuse = computeDiffuse(closest, normal, lightDirection);
+        var specular = computeSpecular(normal, viewDirection, lightDirection);
+        var shadow = isInShadow(point, normal, lightDirection, objects);
+
+        // accumulate
+        for (let c = 0; c < 3; c++) {
+          totalDiffuse[c] += diffuse[c];
+          totalSpecular[c] += specular[c];
+        }
+        totalShadow += shadow;
+      }
+    }
+    // compute average diffuse, specular, and shadow
+    var averageDiffuse = [];
+    for (let c = 0; c < 3; c++) {
+      averageDiffuse[c] = totalDiffuse[c] / light.samples;
+    }
+    var averageSpecular = [];
+    for (let c = 0; c < 3; c++) {
+      averageSpecular[c] = totalSpecular[c] / light.samples;
+    }
+    var averageShadow = totalShadow / light.samples;
+
+    // compute final color of the sub-pixel
+    var finalColor = [];
+    for (let c = 0; c < 3; c++) {
+      //finalColor[c] = (averageShadow * (averageDiffuse[c] + averageSpecular[c]) + ambient[c]) / 3;
+      finalColor[c] = (averageShadow * (averageDiffuse[c] + averageSpecular[c])) / 2;
+    }
+
+    // accumulate final colors of sub-pixels
+    for (let c = 0; c < 3; c++) {
+      totalColor[c] += finalColor[c];
+    }
+  } else { // no intersecting object
+    for (let c = 0; c < 3; c++) {
+      totalColor[c] += backgroundColor[c];
+    }
+  }
+}
+
 // render the volume on the image
 function render() {
   // parse input data into objects
@@ -168,68 +236,7 @@ function render() {
           var rayOrigin = vec3.fromValues(0, 0, 0);
           var rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
           var ray = new Ray(rayOrigin, rayDirection);
-
-          // determine the closest intersecting object
-          var closest = closestIntersectObj(objects, ray);
-
-          // accumulate color of each sub-pixel
-          if (closest != null) { // hit an object
-            let t = closest.intersects(ray);
-            var point = ray.pointAtParameter(t);
-            var normal = closest.normal(point, ray.direction);
-            var viewDirection = vec3.normalize(vec3.create(),
-                vec3.subtract(vec3.create(), ray.origin, point));
-
-            // for each sampling point in area light, compute diffuse, specular,
-            // and shadow and accumulate
-            var ambient = computeAmbient(closest); // independent of light
-            var totalDiffuse = [0, 0, 0];
-            var totalSpecular = [0, 0, 0];
-            var totalShadow = 0;
-            for (var uc = 0; uc < light.usteps; uc++) {
-              for (var vc = 0; vc < light.vsteps; vc++) {
-                var lightPoint = light.pointAt(uc, vc);
-                var lightDirection = vec3.normalize(vec3.create(),
-                    vec3.subtract(vec3.create(), lightPoint, point));
-
-                var diffuse = computeDiffuse(closest, normal, lightDirection);
-                var specular = computeSpecular(normal, viewDirection, lightDirection);
-                var shadow = isInShadow(point, normal, lightDirection, objects);
-
-                // accumulate
-                for (let c = 0; c < 3; c++) {
-                  totalDiffuse[c] += diffuse[c];
-                  totalSpecular[c] += specular[c];
-                }
-                totalShadow += shadow;
-              }
-            }
-            // compute average diffuse, specular, and shadow
-            var averageDiffuse = [];
-            for (let c = 0; c < 3; c++) {
-              averageDiffuse[c] = totalDiffuse[c] / light.samples;
-            }
-            var averageSpecular = [];
-            for (let c = 0; c < 3; c++) {
-              averageSpecular[c] = totalSpecular[c] / light.samples;
-            }
-            var averageShadow = totalShadow / light.samples;
-
-            // compute final color of the sub-pixel
-            var finalColor = [];
-            for (let c = 0; c < 3; c++) {
-              finalColor[c] = (averageShadow * (averageDiffuse[c] + averageSpecular[c]) + ambient[c]) / 3;
-            }
-
-            // accumulate final colors of sub-pixels
-            for (let c = 0; c < 3; c++) {
-              totalColor[c] += finalColor[c];
-            }
-          } else { // no intersecting object
-            for (let c = 0; c < 3; c++) {
-              totalColor[c] += 255; // background color (white)
-            }
-          }
+          castRay(ray, objects, totalColor);
         }
       }
       // compute average color of the pixel
