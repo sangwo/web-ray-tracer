@@ -7,14 +7,17 @@ export class Light {
   // construct an area light
   constructor(corner, uvecFull, usteps, vvecFull, vsteps, r, g, b) {
     this.corner = corner;
+    this.uvecFull = uvecFull;
     this.uvec = vec3.scale(vec3.create(), uvecFull, (1 / usteps));
     this.usteps = usteps;
+    this.vvecFull = vvecFull;
     this.vvec = vec3.scale(vec3.create(), vvecFull, (1 / vsteps));
     this.vsteps = vsteps;
     this.samples = usteps * vsteps;
     this.r = r;
     this.g = g;
     this.b = b;
+    this.objType = "light";
   }
 
   // Given cell position uc, vc relative to corner, return jittered point in
@@ -22,9 +25,9 @@ export class Light {
   pointAt(uc, vc) {
     // jittered point = corner + uvec * (uc + random() * (uvec.length / usteps))
     //                         + vvec * (vc + random() * (vvec.length / vsteps))
-    var u = vec3.scale(vec3.create(), this.uvec,
+    const u = vec3.scale(vec3.create(), this.uvec,
         (uc + Math.random() * (vec3.length(this.uvec) / this.usteps)));
-    var v = vec3.scale(vec3.create(), this.vvec,
+    const v = vec3.scale(vec3.create(), this.vvec,
         (vc + Math.random() * (vec3.length(this.vvec) / this.vsteps)));
     return vec3.add(vec3.create(), vec3.add(vec3.create(), this.corner, u), v);
   }
@@ -33,12 +36,12 @@ export class Light {
   // Given a point and ray direction as vec3 objects, return the normal of the
   // plane containing the (rectangular) area light as a vec3 object
   normal(point, rayDirection) {
-    var normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(),
+    const normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(),
         this.uvec, this.vvec));
-    var negNormal = vec3.negate(vec3.create(), normal);
-    var normalAngle = vec3.angle(normal, vec3.negate(vec3.create(),
+    const negNormal = vec3.negate(vec3.create(), normal);
+    const normalAngle = vec3.angle(normal, vec3.negate(vec3.create(),
         rayDirection));
-    var negNormalAngle = vec3.angle(negNormal, vec3.negate(vec3.create(),
+    const negNormalAngle = vec3.angle(negNormal, vec3.negate(vec3.create(),
         rayDirection));
     if (normalAngle < negNormalAngle) {
       return normal;
@@ -49,29 +52,31 @@ export class Light {
   // Given a Ray object, return the t value for the intersection (null if the
   // ray doesn’t intersect with the rectangle)
   intersects(ray) {
-    var normal = this.normal(null, ray.direction);
+    const normal = this.normal(null, ray.direction);
 
     // check if ray and plane are parallel (no intersection)
-    var normalDotRayDirection = vec3.dot(normal, ray.direction);
-    if (Math.abs(normalDotRayDirection) < Number.EPSILON) {
+    const normalDotRayDirection = vec3.dot(normal, ray.direction);
+    if (Math.abs(normalDotRayDirection) < Number.EPSILON) { // almost 0
       return null;
     }
 
     // compute t
-    var d = vec3.dot(this.corner, normal); // TODO
-    var t = (vec3.dot(normal, ray.origin) + d) / normalDotRayDirection; // TODO
+    const d = vec3.dot(this.corner, normal);
+    const t = (vec3.dot(normal, ray.origin) + d) / normalDotRayDirection;
 
     // check if the point of intersection lies within the rectangle
-    var point = ray.pointAtParameter(t);
-    var cornerPoint = vec3.subtract(vec3.create(), point, this.corner);
-    var uvecUnit = vec3.normalize(vec3.create(), this.uvec);
-    var uProjection = vec3.scale(vec3.create(), uvecUnit, vec3.dot(cornerPoint,
+    const point = ray.pointAtParameter(t);
+    const cornerPoint = vec3.subtract(vec3.create(), point, this.corner);
+    const uvecUnit = vec3.normalize(vec3.create(), this.uvec);
+    const uProjection = vec3.scale(vec3.create(), uvecUnit, vec3.dot(cornerPoint,
         uvecUnit));
-    var vProjection = vec3.subtract(vec3.create(), cornerPoint, uProjection);
+    const vProjection = vec3.subtract(vec3.create(), cornerPoint, uProjection);
     if (vec3.length(uProjection) >= 0 &&
-        vec3.length(uProjection) <= vec3.length(this.uvec) &&
+        vec3.length(uProjection) <= vec3.length(this.uvecFull) &&
         vec3.length(vProjection) >= 0 &&
-        vec3.length(vProjection) <= vec3.length(this.vvec)) {
+        vec3.length(vProjection) <= vec3.length(this.vvecFull) &&
+        vec3.angle(cornerPoint, this.uvec) <= Math.PI / 2 &&
+        vec3.angle(cornerPoint, this.vvec) <= Math.PI / 2) {
           return t;
     }
     return null;

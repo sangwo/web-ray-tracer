@@ -1,0 +1,9 @@
+#rendered-image {
+  border: 1px solid grey;
+}
+
+#log {
+  height: 100px;
+  overflow: scroll;
+  border: 1px solid grey;
+}

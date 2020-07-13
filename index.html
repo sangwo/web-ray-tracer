@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Web Ray Tracer</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
   </head>
   <body>
     <form>
@@ -23,7 +24,10 @@ t, -3, 3, -18, 3, -3, -18, -3, -3, -18, 255, 255, 255
 t, -3, 3, -18, 3, -3, -18, 3, 3, -18, 255, 255, 255</textarea>
       <input id="submit-button" type="submit">
     </form>
-    <canvas id="rendered-image" width="500" height="500" style="border: 1px solid grey;"></canvas>
+    <canvas id="rendered-image" width="500" height="500"></canvas>
+    <div id="log"></div>
+
+    <script type="text/javascript" src="lib/jquery-3.5.1.min.js"></script>
     <script type="text/javascript" src="lib/gl-matrix-min.js"></script>
     <script type="module" src="main.js"></script>
   </body>
