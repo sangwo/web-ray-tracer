@@ -14,10 +14,13 @@ export class Light {
     this.vvec = vec3.scale(vec3.create(), vvecFull, (1 / vsteps));
     this.vsteps = vsteps;
     this.samples = usteps * vsteps;
+    this.position = vec3.add(
+      vec3.create(), vec3.add(vec3.create(), corner,
+      vec3.scale(vec3.create(), uvecFull, 1 / 2)),
+      vec3.scale(vec3.create(), vvecFull, 1 / 2)); // center
     this.r = r;
     this.g = g;
     this.b = b;
-    this.objType = "light";
   }
 
   // Given cell position uc, vc relative to corner, return jittered point in

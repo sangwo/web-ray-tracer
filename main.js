@@ -20,6 +20,12 @@ const d = 8;    // distance from origin to the image
 const samplingWidth = 4; // = sampling height (NxN)
 const backgroundColor = [255, 255, 255];
 
+// shading options
+const diffuseOn = true;
+let ambientOn = false;
+let specularOn = true;
+let softShadowOn = false;
+
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
 function missingInputError(tokens, required) {
@@ -147,9 +153,20 @@ function isInShadow(point, normal, lightDirection, objects) {
   return shadowObj == null;
 }
 
-// Given a ray, array of objects, and an array of accumulated color values r, g,
-// b (initialized as 0), accumulate color of sub-pixels
-function castRay(ray, objects, totalColor) {
+// Given an array of ambient, diffuse, specualr that contains r, g, b values,
+// and shadow value between 0 and 1, return the array of final color
+function computeFinalColor(ambient, diffuse, specular, shadow) {
+  let finalColor = [];
+  for (let c = 0; c < 3; c++) {
+    finalColor[c] = (shadow * (diffuseOn * diffuse[c] +
+        specularOn * specular[c]) + ambientOn * ambient[c]) /
+        (ambientOn + diffuseOn + specularOn);
+  }
+  return finalColor;
+}
+
+// Given a ray and an array of objects, return the color of sub-pixel
+function subpixelColor(ray, objects) {
   // determine the closest intersecting object
   const closest = closestIntersectObj(objects, ray);
 
@@ -161,56 +178,55 @@ function castRay(ray, objects, totalColor) {
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
 
-    // for each sampling point in area light, compute diffuse, specular, and
-    // shadow and accumulate
-    //const ambient = computeAmbient(closest); // independent of light
-    let totalDiffuse = [0, 0, 0];
-    let totalSpecular = [0, 0, 0];
-    let totalShadow = 0;
-    for (let uc = 0; uc < light.usteps; uc++) {
-      for (let vc = 0; vc < light.vsteps; vc++) {
-        const lightPoint = light.pointAt(uc, vc);
-        const lightDirection = vec3.normalize(vec3.create(),
-            vec3.subtract(vec3.create(), lightPoint, point));
+    const ambient = computeAmbient(closest); // independent of light
+    let [diffuse, specular, shadow] = [[], [], []];
+    if (softShadowOn) {
+      // for each sampling point in area light, compute diffuse, specular, and
+      // shadow and accumulate
+      let totalDiffuse = [0, 0, 0];
+      let totalSpecular = [0, 0, 0];
+      let totalShadow = 0;
+      for (let uc = 0; uc < light.usteps; uc++) {
+        for (let vc = 0; vc < light.vsteps; vc++) {
+          const lightPoint = light.pointAt(uc, vc);
+          const lightDirection = vec3.normalize(vec3.create(),
+              vec3.subtract(vec3.create(), lightPoint, point));
 
-        const diffuse = computeDiffuse(closest, normal, lightDirection);
-        const specular = computeSpecular(normal, viewDirection, lightDirection);
-        const shadow = isInShadow(point, normal, lightDirection, objects);
+          // intermediates
+          const diffuseI = computeDiffuse(closest, normal, lightDirection);
+          const specularI = computeSpecular(normal, viewDirection, lightDirection);
+          const shadowI = isInShadow(point, normal, lightDirection, objects);
 
-        // accumulate
-        for (let c = 0; c < 3; c++) {
-          totalDiffuse[c] += diffuse[c];
-          totalSpecular[c] += specular[c];
+          // accumulate
+          for (let c = 0; c < 3; c++) {
+            totalDiffuse[c] += diffuseI[c];
+            totalSpecular[c] += specularI[c];
+          }
+          totalShadow += shadowI;
         }
-        totalShadow += shadow;
       }
-    }
-    // compute average diffuse, specular, and shadow
-    let averageDiffuse = [];
-    for (let c = 0; c < 3; c++) {
-      averageDiffuse[c] = totalDiffuse[c] / light.samples;
-    }
-    let averageSpecular = [];
-    for (let c = 0; c < 3; c++) {
-      averageSpecular[c] = totalSpecular[c] / light.samples;
-    }
-    const averageShadow = totalShadow / light.samples;
+      // compute average diffuse, specular, and shadow
+      for (let c = 0; c < 3; c++) {
+        diffuse[c] = totalDiffuse[c] / light.samples;
+      }
+      for (let c = 0; c < 3; c++) {
+        specular[c] = totalSpecular[c] / light.samples;
+      }
+      shadow = totalShadow / light.samples;
+    } else {
+      // treat area light as point light
+      const lightDirection = vec3.normalize(vec3.create(),
+          vec3.subtract(vec3.create(), light.position, point));
 
+      diffuse = computeDiffuse(closest, normal, lightDirection);
+      specular = computeSpecular(normal, viewDirection, lightDirection);
+      shadow = isInShadow(point, normal, lightDirection, objects);
+    }
     // compute final color of the sub-pixel
-    let finalColor = [];
-    for (let c = 0; c < 3; c++) {
-      //finalColor[c] = (averageShadow * (averageDiffuse[c] + averageSpecular[c]) + ambient[c]) / 3;
-      finalColor[c] = (averageShadow * (averageDiffuse[c] + averageSpecular[c])) / 2;
-    }
-
-    // accumulate final colors of sub-pixels
-    for (let c = 0; c < 3; c++) {
-      totalColor[c] += finalColor[c];
-    }
+    const finalColor = computeFinalColor(ambient, diffuse, specular, shadow);
+    return finalColor;
   } else { // no intersecting object
-    for (let c = 0; c < 3; c++) {
-      totalColor[c] += backgroundColor[c];
-    }
+    return backgroundColor;
   }
 }
 
@@ -234,7 +250,12 @@ function renderPixel(i, j, objects, ctx) {
       const rayOrigin = vec3.fromValues(0, 0, 0);
       const rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
       const ray = new Ray(rayOrigin, rayDirection);
-      castRay(ray, objects, totalColor);
+
+      // compute and accumulate color of sub-pixels
+      const finalColor = subpixelColor(ray, objects);
+      for (let c = 0; c < 3; c++) {
+        totalColor[c] += finalColor[c];
+      }
     }
   }
   // compute average color of the pixel
@@ -262,9 +283,10 @@ function render() {
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
   const ctx = canvas.getContext("2d");
+  let pixel;
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
-      const pixel = setInterval(function() {
+      pixel = setInterval(function() {
         renderPixel(i, j, objects, ctx);
         //addLog("position: (" + i + ", " + j + ")");
       }, 0);
@@ -273,14 +295,26 @@ function render() {
   clearInterval(pixel);
 }
 
-const submitButton = document.getElementById("submit-button");
-submitButton.onclick = function() {
-  try {
-    render();
-  } catch(err) {
-    //alert(err);
-    console.log(err);
-  } finally {
-    return false;
-  }
-}
+$(document).ready(function() {
+  // shading options
+  $("#ambient-option").prop("checked", ambientOn);
+  $("#diffuse-option").prop("checked", diffuseOn);
+  $("#diffuse-option").prop("disabled", true);
+  $("#specular-option").prop("checked", specularOn);
+  $("#soft-shadows-option").prop("checked", softShadowOn);
+
+  // render on button click
+  $("#submit-button").on("click", function() {
+    try {
+      ambientOn = $("#ambient-option").prop("checked");
+      specularOn = $("#specular-option").prop("checked");
+      softShadowOn = $("#soft-shadows-option").prop("checked");
+      render();
+    } catch(err) {
+      //alert(err);
+      console.log(err);
+    } finally {
+      return false;
+    }
+  });
+});
