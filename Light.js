@@ -18,9 +18,15 @@ export class Light {
       vec3.create(), vec3.add(vec3.create(), corner,
       vec3.scale(vec3.create(), uvecFull, 1 / 2)),
       vec3.scale(vec3.create(), vvecFull, 1 / 2)); // center
-    this.r = r;
-    this.g = g;
-    this.b = b;
+    this.color = [r, g, b];
+    this.texture = null; // TODO: add as an argument
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b at
+  // that point
+  colorAt(point) {
+    // TODO: add case for texture
+    return this.color;
   }
 
   // Given cell position uc, vc relative to corner, return jittered point in

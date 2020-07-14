@@ -8,9 +8,15 @@ export class Triangle {
     this.v0 = v0;
     this.v1 = v1;
     this.v2 = v2;
-    this.r = r;
-    this.g = g;
-    this.b = b;
+    this.color = [r, g, b];
+    this.texture = null; // TODO: add as an argument
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b at
+  // that point
+  colorAt(point) {
+    // TODO: add case for texture
+    return this.color;
   }
 
   // Given a point and ray direction as vec3 objects, return the normal of the

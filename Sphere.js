@@ -2,21 +2,37 @@
 const { vec3 } = glMatrix;
 
 export class Sphere {
-  // Given x, y, z coordinates, radius, and the color values r, g, b, construct
-  // a sphere
-  constructor(x, y, z, radius, r, g, b) {
+  // Given x, y, z coordinates, radius, color values r, g, b, and a Texture
+  // object, construct a sphere
+  constructor(x, y, z, radius, r, g, b, texture) {
     this.x = x;
     this.y = y;
     this.z = z;
     this.radius = radius;
-    this.r = r;
-    this.g = g;
-    this.b = b;
+    this.color = [r, g, b];
+    this.texture = texture;
   }
 
   // return the center of the sphere as a vec3 object
   get center() {
     return vec3.fromValues(this.x, this.y, this.z);
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b at
+  // that point
+  colorAt(point) {
+    if (this.texture != null) {
+      // compute u, v
+      const theta = Math.acos((point[2] - this.center[2]) / this.radius);
+      let phi = Math.atan2(point[1] - this.center[1], point[0] - this.center[0]);
+      if (phi < 0) {
+        phi = phi + 2 * Math.PI;
+      }
+      const u = phi / (2 * Math.PI)
+      const v = (Math.PI - theta) / Math.PI;
+      return this.texture.colorAt(u, v);
+    }
+    return this.color;
   }
 
   // Given a point and ray direction as vec3 objects, return the normal at the

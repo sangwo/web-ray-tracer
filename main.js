@@ -3,6 +3,7 @@ import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 import { Triangle } from "./Triangle.js";
 import { Light } from "./Light.js";
+import { Texture } from "./Texture.js";
 
 const light = new Light(
   vec3.fromValues(-1, 0, -12),    // corner
@@ -97,30 +98,28 @@ function closestIntersectObj(objects, ray) {
   return closest;
 }
 
-// Given an object, normal to that object, and light direction, compute and
-// return diffuse component (Lambertian shading) as an array
-function computeDiffuse(closest, normal, lightDirection) {
-  const diffuse = [
-    closest.r * (light.r / 255) * Math.max(0, vec3.dot(normal,
-      lightDirection)), // r
-    closest.g * (light.g / 255) * Math.max(0, vec3.dot(normal,
-      lightDirection)), // g
-    closest.b * (light.b / 255) * Math.max(0, vec3.dot(normal,
-      lightDirection))  // b
-  ];
+// Given an array of color values r, g, b at the point, normal to that point,
+// and light direction, compute and return diffuse component (Lambertian
+// shading) as an array
+function computeDiffuse(color, normal, lightDirection) {
+  let diffuse = [];
+  for (let c = 0; c < 3; c++) {
+    diffuse[c] = color[c] * (light.color[c] / 255) *
+        Math.max(0, vec3.dot(normal, lightDirection));
+  }
   return diffuse;
 }
 
-// Given an object, compute and return ambient component as an array
-function computeAmbient(closest) {
+// Given an array of color values r, g, b at the point, compute and return
+// ambient component as an array
+function computeAmbient(color) {
   const ambientLightIntensity = [255, 255, 255].map(function(x) {
     return x / 255;
   });
-  const ambient = [
-    closest.r * ambientLightIntensity[0], // r
-    closest.g * ambientLightIntensity[1], // g
-    closest.b * ambientLightIntensity[2]  // b
-  ];
+  let ambient = [];
+  for (let c = 0; c < 3; c++) {
+    ambient[c] = color[c] * ambientLightIntensity[c];
+  }
   return ambient;
 }
 
@@ -170,15 +169,16 @@ function subpixelColor(ray, objects) {
   // determine the closest intersecting object
   const closest = closestIntersectObj(objects, ray);
 
-  // accumulate color of each sub-pixel
+  // compute color of each sub-pixel
   if (closest != null) { // hit an object
     const t = closest.intersects(ray);
     const point = ray.pointAtParameter(t);
     const normal = closest.normal(point, ray.direction);
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
+    const color = closest.colorAt(point);
 
-    const ambient = computeAmbient(closest); // independent of light
+    const ambient = computeAmbient(color); // independent of light
     let [diffuse, specular, shadow] = [[], [], []];
     if (softShadowOn) {
       // for each sampling point in area light, compute diffuse, specular, and
@@ -193,7 +193,7 @@ function subpixelColor(ray, objects) {
               vec3.subtract(vec3.create(), lightPoint, point));
 
           // intermediates
-          const diffuseI = computeDiffuse(closest, normal, lightDirection);
+          const diffuseI = computeDiffuse(color, normal, lightDirection);
           const specularI = computeSpecular(normal, viewDirection, lightDirection);
           const shadowI = isInShadow(point, normal, lightDirection, objects);
 
@@ -218,7 +218,7 @@ function subpixelColor(ray, objects) {
       const lightDirection = vec3.normalize(vec3.create(),
           vec3.subtract(vec3.create(), light.position, point));
 
-      diffuse = computeDiffuse(closest, normal, lightDirection);
+      diffuse = computeDiffuse(color, normal, lightDirection);
       specular = computeSpecular(normal, viewDirection, lightDirection);
       shadow = isInShadow(point, normal, lightDirection, objects);
     }
@@ -271,14 +271,22 @@ function renderPixel(i, j, objects, ctx) {
 
 // render the volume on the image
 function render() {
+  /*
   // parse input data into objects
   const input = document.getElementById("input-data").value;
   const objects = parseObjects(input);
-
-  /*
-  // add light as an object
-  objects.push(light);
   */
+
+  // TODO: temporary
+  // load texture
+  const img = new Image();
+  const canvasT = document.createElement("canvas");
+  const ctxT = canvasT.getContext("2d");
+  const earthData = loadTexture(img, canvasT, ctxT, "earth_day.jpg");
+  const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
+  // add the Earth
+  let objects = [];
+  objects.push(new Sphere(0, 0, -15, 2, 255, 255, 255, earthTexture));
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
@@ -293,6 +301,18 @@ function render() {
     }
   }
   clearInterval(pixel);
+}
+
+// Given an Image object, canvas, canvas context, and a file name, return an
+// array of color values r, g, b, a of pixels in the image
+function loadTexture(img, canvas, ctx, fileName) {
+  img.src = "textures/" + fileName;
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.drawImage(img, 0, 0);
+
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return imgData.data;
 }
 
 $(document).ready(function() {
