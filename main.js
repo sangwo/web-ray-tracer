@@ -23,9 +23,12 @@ const backgroundColor = [255, 255, 255];
 
 // shading options
 const diffuseOn = true;
-let ambientOn = false;
-let specularOn = true;
+let ambientOn = true;
+let specularOn = false;
 let softShadowOn = false;
+
+// texture data
+let earthData;
 
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input
@@ -269,20 +272,35 @@ function renderPixel(i, j, objects, ctx) {
   ctx.fillRect(i, ny - 1 - j, 1, 1);
 }
 
+// Given an Image object, canvas, canvas context, and a texture file name,
+// return an array of color values r, g, b, a of pixels in the image
+async function loadTexture(img, canvas, ctx, fileName) {
+  return new Promise((resolve, reject) => {
+    img.onload = function() {
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      resolve(imgData.data);
+    }
+    img.src = "textures/" + fileName;
+  });
+}
+
 // render the volume on the image
-function render() {
+async function render() {
   /*
   // parse input data into objects
   const input = document.getElementById("input-data").value;
   const objects = parseObjects(input);
   */
 
-  // TODO: temporary
-  // load texture
+  // load textures
   const img = new Image();
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
-  const earthData = loadTexture(img, canvasT, ctxT, "earth_day.jpg");
+  const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
   // add the Earth
   let objects = [];
@@ -301,18 +319,6 @@ function render() {
     }
   }
   clearInterval(pixel);
-}
-
-// Given an Image object, canvas, canvas context, and a file name, return an
-// array of color values r, g, b, a of pixels in the image
-function loadTexture(img, canvas, ctx, fileName) {
-  img.src = "textures/" + fileName;
-  canvas.width = img.width;
-  canvas.height = img.height;
-  ctx.drawImage(img, 0, 0);
-
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  return imgData.data;
 }
 
 $(document).ready(function() {
