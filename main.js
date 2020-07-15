@@ -23,12 +23,9 @@ const backgroundColor = [255, 255, 255];
 
 // shading options
 const diffuseOn = true;
-let ambientOn = true;
+let ambientOn = true; // TODO: change to false
 let specularOn = false;
 let softShadowOn = false;
-
-// texture data
-let earthData;
 
 // Given an array of tokens and a required number of tokens, throw an error if
 // missing input

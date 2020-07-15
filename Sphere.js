@@ -23,8 +23,8 @@ export class Sphere {
   colorAt(point) {
     if (this.texture != null) {
       // compute u, v
-      const theta = Math.acos((point[2] - this.center[2]) / this.radius);
-      let phi = Math.atan2(point[1] - this.center[1], point[0] - this.center[0]);
+      const theta = Math.acos((point[1] - this.center[1]) / this.radius);
+      let phi = Math.atan2(point[2] - this.center[2], -point[0] - -this.center[0]);
       if (phi < 0) {
         phi = phi + 2 * Math.PI;
       }
