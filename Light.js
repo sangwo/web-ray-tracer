@@ -19,7 +19,11 @@ export class Light {
       vec3.scale(vec3.create(), uvecFull, 1 / 2)),
       vec3.scale(vec3.create(), vvecFull, 1 / 2)); // center
     this.color = [r, g, b];
-    this.texture = null; // TODO: add as an argument
+    // TODO: add as an argument
+    this.diffuseOn = false;
+    this.ambientOn = true;
+    this.specularOn = false;
+    this.texture = null;
   }
 
   // Given a point as a vec3 object, return an array of color values r, g, b at
@@ -41,7 +45,6 @@ export class Light {
     return vec3.add(vec3.create(), vec3.add(vec3.create(), this.corner, u), v);
   }
 
-  /*
   // Given a point and ray direction as vec3 objects, return the normal of the
   // plane containing the (rectangular) area light as a vec3 object
   normal(point, rayDirection) {
@@ -90,5 +93,4 @@ export class Light {
     }
     return null;
   }
-  */
 }

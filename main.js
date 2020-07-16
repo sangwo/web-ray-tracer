@@ -21,10 +21,7 @@ const d = 8;    // distance from origin to the image
 const samplingWidth = 4; // = sampling height (NxN)
 const backgroundColor = [255, 255, 255];
 
-// shading options
-const diffuseOn = true;
-let ambientOn = true; // TODO: change to false
-let specularOn = false;
+// shading option
 let softShadowOn = false;
 
 // Given an array of tokens and a required number of tokens, throw an error if
@@ -82,10 +79,9 @@ function parseObjects(input) {
   return objects;
 }
 
-// Given an array of objects and a Ray object, return the closest object that
-// intersects with the ray
-function closestIntersectObj(objects, ray) {
-  let tMin = Infinity;
+// Given an array of objects, Ray object, and how far the ray can go, return the
+// closest object that intersects with the ray
+function closestIntersectObj(objects, ray, tMin) {
   let closest = null;
   for (let k = 0; k < objects.length; k++) {
     const t = objects[k].intersects(ray);
@@ -148,18 +144,20 @@ function isInShadow(point, normal, lightDirection, objects) {
   const biasedPoint = vec3.add(vec3.create(), point,
       vec3.scale(vec3.create(), normal, shadowBias));
   const shadowRay = new Ray(biasedPoint, lightDirection);
-  const shadowObj = closestIntersectObj(objects, shadowRay);
+  // intersects with an object in-between the point and the light
+  const tLight = light.intersects(shadowRay);
+  const shadowObj = closestIntersectObj(objects, shadowRay, tLight);
   return shadowObj == null;
 }
 
-// Given an array of ambient, diffuse, specualr that contains r, g, b values,
-// and shadow value between 0 and 1, return the array of final color
-function computeFinalColor(ambient, diffuse, specular, shadow) {
+// Given an object, array of ambient, diffuse, specualr that contains r, g, b
+// values, and shadow value between 0 and 1, return the array of final color
+function computeFinalColor(closest, ambient, diffuse, specular, shadow) {
   let finalColor = [];
   for (let c = 0; c < 3; c++) {
-    finalColor[c] = (shadow * (diffuseOn * diffuse[c] +
-        specularOn * specular[c]) + ambientOn * ambient[c]) /
-        (ambientOn + diffuseOn + specularOn);
+    finalColor[c] = (shadow * (closest.diffuseOn * diffuse[c] +
+        closest.specularOn * specular[c]) + closest.ambientOn * ambient[c]) /
+        (closest.ambientOn + closest.diffuseOn + closest.specularOn);
   }
   return finalColor;
 }
@@ -167,7 +165,7 @@ function computeFinalColor(ambient, diffuse, specular, shadow) {
 // Given a ray and an array of objects, return the color of sub-pixel
 function subpixelColor(ray, objects) {
   // determine the closest intersecting object
-  const closest = closestIntersectObj(objects, ray);
+  const closest = closestIntersectObj(objects, ray, Infinity);
 
   // compute color of each sub-pixel
   if (closest != null) { // hit an object
@@ -223,7 +221,7 @@ function subpixelColor(ray, objects) {
       shadow = isInShadow(point, normal, lightDirection, objects);
     }
     // compute final color of the sub-pixel
-    const finalColor = computeFinalColor(ambient, diffuse, specular, shadow);
+    const finalColor = computeFinalColor(closest, ambient, diffuse, specular, shadow);
     return finalColor;
   } else { // no intersecting object
     return backgroundColor;
@@ -292,16 +290,22 @@ async function render() {
   const input = document.getElementById("input-data").value;
   const objects = parseObjects(input);
   */
+  let objects = [];
 
-  // load textures
+  // prepare to load textures
   const img = new Image();
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
+
+  // load textures and add objects
+  // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  // add the Earth
-  let objects = [];
-  objects.push(new Sphere(0, 0, -15, 2, 255, 255, 255, earthTexture));
+  objects.push(new Sphere(0, 0, -15, 2, 255, 255, 255, true, true, false, earthTexture));
+  // starfield
+  const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
+  const starTexture = new Texture(starData, canvasT.width, canvasT.height);
+  objects.push(new Sphere(0, 0, -15, 20, 0, 0, 0, false, true, false, starTexture)); // TODO: make it bigger
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
@@ -319,25 +323,10 @@ async function render() {
 }
 
 $(document).ready(function() {
-  // shading options
-  $("#ambient-option").prop("checked", ambientOn);
-  $("#diffuse-option").prop("checked", diffuseOn);
-  $("#diffuse-option").prop("disabled", true);
-  $("#specular-option").prop("checked", specularOn);
-  $("#soft-shadows-option").prop("checked", softShadowOn);
-
-  // render on button click
-  $("#submit-button").on("click", function() {
-    try {
-      ambientOn = $("#ambient-option").prop("checked");
-      specularOn = $("#specular-option").prop("checked");
-      softShadowOn = $("#soft-shadows-option").prop("checked");
-      render();
-    } catch(err) {
-      //alert(err);
-      console.log(err);
-    } finally {
-      return false;
-    }
-  });
+  try {
+    render();
+  } catch(err) {
+    //alert(err);
+    console.log(err);
+  }
 });

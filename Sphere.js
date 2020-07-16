@@ -2,15 +2,19 @@
 const { vec3 } = glMatrix;
 
 export class Sphere {
-  // Given x, y, z coordinates, radius, color values r, g, b, and a Texture
-  // object, construct a sphere
-  constructor(x, y, z, radius, r, g, b, texture) {
+  // Given x, y, z coordinates, radius, color values r, g, b, whether diffuse,
+  // ambient, specular components are on, and a Texture object, construct a
+  // sphere
+  constructor(x, y, z, radius, r, g, b, diffuseOn, ambientOn, specularOn, texture=null) {
     this.x = x;
     this.y = y;
     this.z = z;
     this.radius = radius;
     this.color = [r, g, b];
     this.texture = texture;
+    this.diffuseOn = diffuseOn;
+    this.ambientOn = ambientOn;
+    this.specularOn = specularOn;
   }
 
   // return the center of the sphere as a vec3 object
@@ -54,8 +58,12 @@ export class Sphere {
     if (discriminant < 0) {
       return null;
     }
-    // keep the smaller (closer) value of t
-    const t = (-b - Math.sqrt(discriminant)) / 2*a;
-    return t;
+
+    // compute t value
+    if (vec3.length(oc) < this.radius) { // ray origin inside the sphere
+      return (-b + Math.sqrt(discriminant)) / 2*a;
+    } else { // choose smaller (closer) value of t
+      return (-b - Math.sqrt(discriminant)) / 2*a;
+    }
   }
 }

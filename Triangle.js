@@ -9,7 +9,11 @@ export class Triangle {
     this.v1 = v1;
     this.v2 = v2;
     this.color = [r, g, b];
-    this.texture = null; // TODO: add as an argument
+    // TODO: add as an argument
+    this.diffuseOn = true;
+    this.ambientOn = true;
+    this.specularOn = true;
+    this.texture = null;
   }
 
   // Given a point as a vec3 object, return an array of color values r, g, b at
