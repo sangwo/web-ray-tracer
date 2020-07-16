@@ -310,11 +310,18 @@ async function render() {
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
   const ctx = canvas.getContext("2d");
+  let pixelNumber = 1;
+  let percent = 0;
+  $("#log").text("loading... 0%");
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
       setTimeout(function() {
         renderPixel(i, j, objects, ctx);
-        $("#log").text("rendering pixel at (" + i + ", " + j + ")...");
+        if (pixelNumber % ((nx * ny) / 100) == 0) {
+          percent++;
+          $("#log").text("loading... " + percent + "%");
+        }
+        pixelNumber++;
       }, 0);
     }
   }
