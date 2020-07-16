@@ -310,23 +310,34 @@ async function render() {
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
   const ctx = canvas.getContext("2d");
-  let pixel;
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
-      pixel = setInterval(function() {
+      setTimeout(function() {
         renderPixel(i, j, objects, ctx);
-        //addLog("position: (" + i + ", " + j + ")");
+        $("#log").text("rendering pixel at (" + i + ", " + j + ")...");
       }, 0);
     }
   }
-  clearInterval(pixel);
 }
 
 $(document).ready(function() {
+  // TODO: for debugging
+  $("#submit-button").on("click", function() {
+    try {
+      render();
+    } catch(err) {
+      //alert(err);
+      console.log(err);
+    } finally {
+      return false;
+    }
+  });
+  /*
   try {
     render();
   } catch(err) {
     //alert(err);
     console.log(err);
   }
+  */
 });
