@@ -1,4 +1,4 @@
-const { vec3 } = glMatrix;
+const { vec3, mat3 } = glMatrix;
 import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 import { Triangle } from "./Triangle.js";
@@ -6,7 +6,7 @@ import { Light } from "./Light.js";
 import { Texture } from "./Texture.js";
 
 const light = new Light(
-  vec3.fromValues(-1, 0, -12),    // corner
+  vec3.fromValues(-1, 0, 3),    // corner
   vec3.fromValues(2, 0, 0), 2,    // uvecFull, usteps
   vec3.fromValues(0, 2, 0), 2,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
@@ -169,12 +169,24 @@ function subpixelColor(ray, objects) {
 
   // compute color of each sub-pixel
   if (closest != null) { // hit an object
-    const t = closest.intersects(ray);
-    const point = ray.pointAtParameter(t);
-    const normal = closest.normal(point, ray.direction);
+    // TODO: repetitive
+    // transform the ray according to the object's inverse transformation matrix
+    const inverseTransform = mat3.invert(mat3.create(), closest.transform);
+    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, inverseTransform);
+    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, inverseTransform);
+    const transRay = new Ray(transOrigin, transDirection);
+
+    // compute intersection of the transformed ray and the untransformed object
+    const transT = closest.intersects(transRay);
+    const transPoint = transRay.pointAtParameter(transT);
+    const transNormal = closest.normal(transPoint, transRay.direction);
+    // point of intersection of the original ray and the transformed object
+    const point = vec3.transformMat3(vec3.create(), transPoint, closest.transform);
+    // normal to the transformed object
+    const normal = vec3.transformMat3(vec3.create(), transNormal, closest.transform);
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
-    const color = closest.colorAt(point);
+    const color = closest.colorAt(transPoint);
 
     const ambient = computeAmbient(color); // independent of light
     let [diffuse, specular, shadow] = [[], [], []];
@@ -245,7 +257,7 @@ function renderPixel(i, j, objects, ctx) {
       // cast a ray (random position within the sub-pixel)
       const u = l + (r - l) * (ic + (Math.random() / samplingWidth)) / nx;
       const v = b + (t - b) * (jc + (Math.random() / samplingWidth)) / ny;
-      const rayOrigin = vec3.fromValues(0, 0, 0);
+      const rayOrigin = vec3.fromValues(0, 0, 15);
       const rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
       const ray = new Ray(rayOrigin, rayDirection);
 
@@ -285,11 +297,6 @@ async function loadTexture(img, canvas, ctx, fileName) {
 
 // render the volume on the image
 async function render() {
-  /*
-  // parse input data into objects
-  const input = document.getElementById("input-data").value;
-  const objects = parseObjects(input);
-  */
   let objects = [];
 
   // prepare to load textures
@@ -301,11 +308,14 @@ async function render() {
   // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  objects.push(new Sphere(0, 0, -15, 2, 255, 255, 255, true, true, false, earthTexture));
+  const earth = new Sphere(0, 0, 0, 2, 255, 255, 255, true, true, false, earthTexture);
+  earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees
+  objects.push(earth);
+
   // starfield
   const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
   const starTexture = new Texture(starData, canvasT.width, canvasT.height);
-  objects.push(new Sphere(0, 0, -15, 20, 0, 0, 0, false, true, false, starTexture)); // TODO: make it bigger
+  objects.push(new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false, starTexture)); // TODO: make it bigger
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
@@ -339,12 +349,4 @@ $(document).ready(function() {
       return false;
     }
   });
-  /*
-  try {
-    render();
-  } catch(err) {
-    //alert(err);
-    console.log(err);
-  }
-  */
 });

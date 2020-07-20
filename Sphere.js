@@ -1,5 +1,6 @@
 // class defining a sphere
-const { vec3 } = glMatrix;
+const { vec3, mat3 } = glMatrix;
+import { Ray } from "./Ray.js";
 
 export class Sphere {
   // Given x, y, z coordinates, radius, color values r, g, b, whether diffuse,
@@ -15,6 +16,7 @@ export class Sphere {
     this.diffuseOn = diffuseOn;
     this.ambientOn = ambientOn;
     this.specularOn = specularOn;
+    this.transform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // identity matrix
   }
 
   // return the center of the sphere as a vec3 object
@@ -49,9 +51,16 @@ export class Sphere {
   // Given a Ray object, return the t value for the intersection (null if the
   // ray doesn’t intersect with the sphere)
   intersects(ray) {
-    const oc = vec3.subtract(vec3.create(), ray.origin, this.center);
-    const a = vec3.dot(ray.direction, ray.direction);
-    const b = 2 * vec3.dot(ray.direction, oc);
+    // transform the ray according to the object's inverse transformation matrix
+    const inverseTransform = mat3.invert(mat3.create(), this.transform);
+    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, inverseTransform);
+    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, inverseTransform);
+    const transRay = new Ray(transOrigin, transDirection);
+
+    // compute intersection of the transformed ray and the object
+    const oc = vec3.subtract(vec3.create(), transRay.origin, this.center);
+    const a = vec3.dot(transRay.direction, transRay.direction);
+    const b = 2 * vec3.dot(transRay.direction, oc);
     const c = vec3.dot(oc, oc) - this.radius * this.radius;
     const discriminant = b*b - 4*a*c;
 
@@ -65,5 +74,20 @@ export class Sphere {
     } else { // choose smaller (closer) value of t
       return (-b - Math.sqrt(discriminant)) / 2*a;
     }
+  }
+
+  // Given an axis to rotate about as a vec3 object and an angle to rotate by in
+  // radians, compute rotation matrix and multiply it to transformation matrix
+  rotate(axis, angle) {
+    const w = vec3.normalize(vec3.create(), axis);
+    // TODO: how do I compute non-collinear vector?
+    const t = vec3.fromValues(w[0] + 1,  2 * w[1] + 1, 3 * w[2] + 1); // any vector not collinear with w
+    const u = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), w, t));
+    const v = vec3.cross(vec3.create(), w, u);
+    const objectToWorld = mat3.fromValues(u[0], v[0], w[0], u[1], v[1], w[1], u[2], v[2], w[2]);
+    const rotationMat = mat3.fromValues(Math.cos(angle), Math.sin(angle), 0, -Math.sin(angle), Math.cos(angle), 0, 0, 0, 1);
+    const worldToObject = mat3.fromValues(u[0], u[1], u[2], v[0], v[1], v[2], w[0], w[1], w[2]);
+    const result = mat3.multiply(mat3.create(), mat3.multiply(mat3.create(), worldToObject, rotationMat), objectToWorld);
+    this.transform = mat3.multiply(mat3.create(), this.transform, result);
   }
 }
