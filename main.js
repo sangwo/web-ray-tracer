@@ -6,7 +6,7 @@ import { Light } from "./Light.js";
 import { Texture } from "./Texture.js";
 
 const light = new Light(
-  vec3.fromValues(-1, 0, 3),    // corner
+  vec3.fromValues(-1, 0, 6),      // corner
   vec3.fromValues(2, 0, 0), 2,    // uvecFull, usteps
   vec3.fromValues(0, 2, 0), 2,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
@@ -176,14 +176,15 @@ function subpixelColor(ray, objects) {
     const transDirection = vec3.transformMat3(vec3.create(), ray.direction, inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
-    // compute intersection of the transformed ray and the untransformed object
-    const transT = closest.intersects(transRay);
-    const transPoint = transRay.pointAtParameter(transT);
+    // compute intersection of the (transformed) ray and the untransformed object
+    const tVal = closest.intersects(ray);
+    const transPoint = transRay.pointAtParameter(tVal);
     const transNormal = closest.normal(transPoint, transRay.direction);
     // point of intersection of the original ray and the transformed object
     const point = vec3.transformMat3(vec3.create(), transPoint, closest.transform);
     // normal to the transformed object
-    const normal = vec3.transformMat3(vec3.create(), transNormal, closest.transform);
+    let normal = vec3.transformMat3(vec3.create(), transNormal, mat3.transpose(mat3.create(), inverseTransform));
+    vec3.normalize(normal, normal); // TODO: required?
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
     const color = closest.colorAt(transPoint);
@@ -306,16 +307,23 @@ async function render() {
 
   // load textures and add objects
   // earth
+  /*
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  const earth = new Sphere(0, 0, 0, 2, 255, 255, 255, true, true, false, earthTexture);
-  earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees
+  const earth = new Sphere(0, 0, 0, 1, 255, 255, 255, true, true, false, earthTexture);
+  earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
+  earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), Math.PI / 10); // Earth's rotation
+  */
+  const earth = new Sphere(0, 0, 0, 1, 0, 0, 255, true, false, false);
+  earth.scale(2, 1, 1);
   objects.push(earth);
 
+  /*
   // starfield
   const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
   const starTexture = new Texture(starData, canvasT.width, canvasT.height);
   objects.push(new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false, starTexture)); // TODO: make it bigger
+  */
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");

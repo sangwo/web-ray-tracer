@@ -57,7 +57,7 @@ export class Sphere {
     const transDirection = vec3.transformMat3(vec3.create(), ray.direction, inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
-    // compute intersection of the transformed ray and the object
+    // compute intersection of the (transformed) ray and the object
     const oc = vec3.subtract(vec3.create(), transRay.origin, this.center);
     const a = vec3.dot(transRay.direction, transRay.direction);
     const b = 2 * vec3.dot(transRay.direction, oc);
@@ -70,9 +70,9 @@ export class Sphere {
 
     // compute t value
     if (vec3.length(oc) < this.radius) { // ray origin inside the sphere
-      return (-b + Math.sqrt(discriminant)) / 2*a;
+      return (-b + Math.sqrt(discriminant)) / (2 * a);
     } else { // choose smaller (closer) value of t
-      return (-b - Math.sqrt(discriminant)) / 2*a;
+      return (-b - Math.sqrt(discriminant)) / (2 * a);
     }
   }
 
@@ -89,5 +89,12 @@ export class Sphere {
     const worldToObject = mat3.fromValues(u[0], u[1], u[2], v[0], v[1], v[2], w[0], w[1], w[2]);
     const result = mat3.multiply(mat3.create(), mat3.multiply(mat3.create(), worldToObject, rotationMat), objectToWorld);
     this.transform = mat3.multiply(mat3.create(), this.transform, result);
+  }
+
+  // Given scaling factors in x, y, z directions, compute scaling matrix and
+  // multiply it to transformation matrix
+  scale(sx, sy, sz) {
+    const scalingMat = mat3.fromValues(sx, 0, 0, 0, sy, 0, 0, 0, sz);
+    this.transform = mat3.multiply(mat3.create(), this.transform, scalingMat);
   }
 }
