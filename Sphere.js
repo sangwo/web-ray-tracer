@@ -17,6 +17,7 @@ export class Sphere {
     this.ambientOn = ambientOn;
     this.specularOn = specularOn;
     this.transform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // identity matrix
+    this.inverseTransform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // inverse identity matrix
   }
 
   // return the center of the sphere as a vec3 object
@@ -52,9 +53,8 @@ export class Sphere {
   // ray doesn’t intersect with the sphere)
   intersects(ray) {
     // transform the ray according to the object's inverse transformation matrix
-    const inverseTransform = mat3.invert(mat3.create(), this.transform);
-    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, inverseTransform);
-    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, inverseTransform);
+    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, this.inverseTransform);
+    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, this.inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
     // compute intersection of the (transformed) ray and the object
@@ -62,7 +62,7 @@ export class Sphere {
     const a = vec3.dot(transRay.direction, transRay.direction);
     const b = 2 * vec3.dot(transRay.direction, oc);
     const c = vec3.dot(oc, oc) - this.radius * this.radius;
-    const discriminant = b*b - 4*a*c;
+    const discriminant = b * b - 4 * a * c;
 
     if (discriminant < 0) {
       return null;
@@ -88,13 +88,15 @@ export class Sphere {
     const rotationMat = mat3.fromValues(Math.cos(angle), Math.sin(angle), 0, -Math.sin(angle), Math.cos(angle), 0, 0, 0, 1);
     const worldToObject = mat3.fromValues(u[0], u[1], u[2], v[0], v[1], v[2], w[0], w[1], w[2]);
     const result = mat3.multiply(mat3.create(), mat3.multiply(mat3.create(), worldToObject, rotationMat), objectToWorld);
-    this.transform = mat3.multiply(mat3.create(), this.transform, result);
+    mat3.multiply(this.transform, result, this.transform);
+    mat3.multiply(this.inverseTransform, this.inverseTransform, mat3.invert(mat3.create(), result));
   }
 
   // Given scaling factors in x, y, z directions, compute scaling matrix and
   // multiply it to transformation matrix
   scale(sx, sy, sz) {
     const scalingMat = mat3.fromValues(sx, 0, 0, 0, sy, 0, 0, 0, sz);
-    this.transform = mat3.multiply(mat3.create(), this.transform, scalingMat);
+    mat3.multiply(this.transform, scalingMat, this.transform);
+    mat3.multiply(this.inverseTransform, this.inverseTransform, mat3.invert(mat3.create(), scalingMat));
   }
 }

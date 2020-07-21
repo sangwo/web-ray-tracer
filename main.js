@@ -171,9 +171,8 @@ function subpixelColor(ray, objects) {
   if (closest != null) { // hit an object
     // TODO: repetitive
     // transform the ray according to the object's inverse transformation matrix
-    const inverseTransform = mat3.invert(mat3.create(), closest.transform);
-    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, inverseTransform);
-    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, inverseTransform);
+    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, closest.inverseTransform);
+    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, closest.inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
     // compute intersection of the (transformed) ray and the untransformed object
@@ -183,7 +182,7 @@ function subpixelColor(ray, objects) {
     // point of intersection of the original ray and the transformed object
     const point = vec3.transformMat3(vec3.create(), transPoint, closest.transform);
     // normal to the transformed object
-    let normal = vec3.transformMat3(vec3.create(), transNormal, mat3.transpose(mat3.create(), inverseTransform));
+    let normal = vec3.transformMat3(vec3.create(), transNormal, mat3.transpose(mat3.create(), closest.inverseTransform));
     vec3.normalize(normal, normal); // TODO: required?
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
@@ -314,8 +313,9 @@ async function render() {
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
   earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), Math.PI / 10); // Earth's rotation
   */
-  const earth = new Sphere(0, 0, 0, 1, 0, 0, 255, true, false, false);
+  const earth = new Sphere(0, 0, 0, 1, 0, 0, 255, true, true, true);
   earth.scale(2, 1, 1);
+  earth.rotate(vec3.fromValues(0, 0, 1), -Math.PI / 4);
   objects.push(earth);
 
   /*
