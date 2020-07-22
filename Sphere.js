@@ -4,13 +4,9 @@ import { Ray } from "./Ray.js";
 
 export class Sphere {
   // Given x, y, z coordinates, radius, color values r, g, b, whether diffuse,
-  // ambient, specular components are on, and a Texture object, construct a
-  // sphere
+  // ambient, specular components are on, and optionally a Texture object,
+  // construct an unit sphere centered at origin (possibly transformed)
   constructor(x, y, z, radius, r, g, b, diffuseOn, ambientOn, specularOn, texture=null) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.radius = radius;
     this.color = [r, g, b];
     this.texture = texture;
     this.diffuseOn = diffuseOn;
@@ -18,11 +14,8 @@ export class Sphere {
     this.specularOn = specularOn;
     this.transform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // identity matrix
     this.inverseTransform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // inverse identity matrix
-  }
-
-  // return the center of the sphere as a vec3 object
-  get center() {
-    return vec3.fromValues(this.x, this.y, this.z);
+    // TODO: change to given x, y, z, translate
+    this.scale(radius, radius, radius);
   }
 
   // Given a point as a vec3 object, return an array of color values r, g, b at
@@ -30,8 +23,8 @@ export class Sphere {
   colorAt(point) {
     if (this.texture != null) {
       // compute u, v
-      const theta = Math.acos((point[1] - this.center[1]) / this.radius);
-      let phi = Math.atan2(point[2] - this.center[2], -point[0] - -this.center[0]);
+      const theta = Math.acos(point[1]);
+      let phi = Math.atan2(point[2], -point[0]);
       if (phi < 0) {
         phi = phi + 2 * Math.PI;
       }
@@ -45,8 +38,7 @@ export class Sphere {
   // Given a point and ray direction as vec3 objects, return the normal at the
   // point as a vec3 object
   normal(point, rayDirection) {
-    return vec3.normalize(vec3.create(), vec3.subtract(vec3.create(), point,
-        this.center));
+    return vec3.normalize(vec3.create(), point);
   }
 
   // Given a Ray object, return the t value for the intersection (null if the
@@ -58,10 +50,9 @@ export class Sphere {
     const transRay = new Ray(transOrigin, transDirection);
 
     // compute intersection of the (transformed) ray and the object
-    const oc = vec3.subtract(vec3.create(), transRay.origin, this.center);
     const a = vec3.dot(transRay.direction, transRay.direction);
-    const b = 2 * vec3.dot(transRay.direction, oc);
-    const c = vec3.dot(oc, oc) - this.radius * this.radius;
+    const b = 2 * vec3.dot(transRay.direction, transRay.origin);
+    const c = vec3.dot(transRay.origin, transRay.origin) - 1;
     const discriminant = b * b - 4 * a * c;
 
     if (discriminant < 0) {
@@ -69,7 +60,7 @@ export class Sphere {
     }
 
     // compute t value
-    if (vec3.length(oc) < this.radius) { // ray origin inside the sphere
+    if (vec3.length(transRay.origin) < 1) { // ray origin inside the sphere
       return (-b + Math.sqrt(discriminant)) / (2 * a);
     } else { // choose smaller (closer) value of t
       return (-b - Math.sqrt(discriminant)) / (2 * a);
