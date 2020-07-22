@@ -1,6 +1,7 @@
 // class defining a sphere
-const { vec3, mat3 } = glMatrix;
+const { vec3, mat4 } = glMatrix;
 import { Ray } from "./Ray.js";
+import * as util from "./utility.js";
 
 export class Sphere {
   // Given x, y, z coordinates, radius, color values r, g, b, whether diffuse,
@@ -12,8 +13,18 @@ export class Sphere {
     this.diffuseOn = diffuseOn;
     this.ambientOn = ambientOn;
     this.specularOn = specularOn;
-    this.transform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // identity matrix
-    this.inverseTransform = mat3.fromValues(1, 0, 0, 0, 1, 0, 0, 0, 1); // inverse identity matrix
+    this.transform = mat4.fromValues(
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ); // identity matrix
+    this.inverseTransform = mat4.fromValues(
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ); // inverse identity matrix
     // TODO: change to given x, y, z, translate
     this.scale(radius, radius, radius);
   }
@@ -45,8 +56,8 @@ export class Sphere {
   // ray doesn’t intersect with the sphere)
   intersects(ray) {
     // transform the ray according to the object's inverse transformation matrix
-    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, this.inverseTransform);
-    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, this.inverseTransform);
+    const transOrigin = util.transformPosition(ray.origin, this.inverseTransform);
+    const transDirection = util.transformDirection(ray.direction, this.inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
     // compute intersection of the (transformed) ray and the object
@@ -75,19 +86,52 @@ export class Sphere {
     const t = vec3.fromValues(w[0] + 1,  2 * w[1] + 1, 3 * w[2] + 1); // any vector not collinear with w
     const u = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), w, t));
     const v = vec3.cross(vec3.create(), w, u);
-    const objectToWorld = mat3.fromValues(u[0], v[0], w[0], u[1], v[1], w[1], u[2], v[2], w[2]);
-    const rotationMat = mat3.fromValues(Math.cos(angle), Math.sin(angle), 0, -Math.sin(angle), Math.cos(angle), 0, 0, 0, 1);
-    const worldToObject = mat3.fromValues(u[0], u[1], u[2], v[0], v[1], v[2], w[0], w[1], w[2]);
-    const result = mat3.multiply(mat3.create(), mat3.multiply(mat3.create(), worldToObject, rotationMat), objectToWorld);
-    mat3.multiply(this.transform, result, this.transform);
-    mat3.multiply(this.inverseTransform, this.inverseTransform, mat3.invert(mat3.create(), result));
+    const objectToWorld = mat4.fromValues(
+      u[0], v[0], w[0], 0,
+      u[1],v[1], w[1], 0,
+      u[2], v[2], w[2], 0,
+      0, 0, 0, 1
+    );
+    const rotationMat = mat4.fromValues(
+      Math.cos(angle), Math.sin(angle), 0, 0,
+      -Math.sin(angle), Math.cos(angle), 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    );
+    const worldToObject = mat4.fromValues(
+      u[0], u[1], u[2], 0,
+      v[0], v[1], v[2], 0,
+      w[0], w[1], w[2], 0,
+      0, 0, 0, 1
+    );
+    const result = mat4.multiply(mat4.create(), mat4.multiply(mat4.create(), worldToObject, rotationMat), objectToWorld);
+    mat4.multiply(this.transform, result, this.transform);
+    mat4.multiply(this.inverseTransform, this.inverseTransform, mat4.invert(mat4.create(), result));
   }
 
   // Given scaling factors in x, y, z directions, compute scaling matrix and
   // multiply it to transformation matrix
   scale(sx, sy, sz) {
-    const scalingMat = mat3.fromValues(sx, 0, 0, 0, sy, 0, 0, 0, sz);
-    mat3.multiply(this.transform, scalingMat, this.transform);
-    mat3.multiply(this.inverseTransform, this.inverseTransform, mat3.invert(mat3.create(), scalingMat));
+    const scalingMat = mat4.fromValues(
+      sx, 0, 0, 0,
+      0, sy, 0, 0,
+      0, 0, sz, 0,
+      0, 0, 0, 1
+    );
+    mat4.multiply(this.transform, scalingMat, this.transform);
+    mat4.multiply(this.inverseTransform, this.inverseTransform, mat4.invert(mat4.create(), scalingMat));
+  }
+
+  // Given x, y, z to translate by, compute translation matrix and multiply it
+  // to transformation matrix
+  translate(x, y, z) {
+    const translMat = mat4.fromValues(
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      x, y, z, 1
+    );
+    mat4.multiply(this.transform, translMat, this.transform);
+    mat4.multiply(this.inverseTransform, this.inverseTransform, mat4.invert(mat4.create(), translMat));
   }
 }

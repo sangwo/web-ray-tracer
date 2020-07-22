@@ -1,9 +1,10 @@
-const { vec3, mat3 } = glMatrix;
+const { vec3, mat4 } = glMatrix;
 import { Sphere } from "./Sphere.js";
 import { Ray } from "./Ray.js";
 import { Triangle } from "./Triangle.js";
 import { Light } from "./Light.js";
 import { Texture } from "./Texture.js";
+import * as util from "./utility.js";
 
 const light = new Light(
   vec3.fromValues(-1, 0, 6),      // corner
@@ -171,8 +172,8 @@ function subpixelColor(ray, objects) {
   if (closest != null) { // hit an object
     // TODO: repetitive
     // transform the ray according to the object's inverse transformation matrix
-    const transOrigin = vec3.transformMat3(vec3.create(), ray.origin, closest.inverseTransform);
-    const transDirection = vec3.transformMat3(vec3.create(), ray.direction, closest.inverseTransform);
+    const transOrigin = util.transformPosition(ray.origin, closest.inverseTransform);
+    const transDirection = util.transformDirection(ray.direction, closest.inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
     // compute intersection of the (transformed) ray and the untransformed object
@@ -180,9 +181,9 @@ function subpixelColor(ray, objects) {
     const transPoint = transRay.pointAtParameter(tVal);
     const transNormal = closest.normal(transPoint, transRay.direction);
     // point of intersection of the original ray and the transformed object
-    const point = vec3.transformMat3(vec3.create(), transPoint, closest.transform);
+    const point = util.transformPosition(transPoint, closest.transform);
     // normal to the transformed object
-    let normal = vec3.transformMat3(vec3.create(), transNormal, mat3.transpose(mat3.create(), closest.inverseTransform));
+    let normal = util.transformDirection(transNormal, mat4.transpose(mat4.create(), closest.inverseTransform));
     vec3.normalize(normal, normal); // TODO: required?
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
@@ -312,10 +313,12 @@ async function render() {
   const earth = new Sphere(0, 0, 0, 1, 255, 255, 255, true, true, false, earthTexture);
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
   earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), Math.PI / 10); // Earth's rotation
+  earth.scale(2, 2, 2);
   */
   const earth = new Sphere(0, 0, 0, 1, 0, 0, 255, true, true, true);
   earth.scale(2, 1, 1);
-  earth.rotate(vec3.fromValues(0, 0, 1), -Math.PI / 4);
+  earth.rotate(vec3.fromValues(0, 0, 1), -Math.PI / 6);
+  earth.translate(-2, 0, -2);
   objects.push(earth);
 
   /*
