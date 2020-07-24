@@ -307,18 +307,16 @@ async function render() {
 
   // load textures and add objects
   // earth
-  /*
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  const earth = new Sphere(0, 0, 0, 1, 255, 255, 255, true, true, false, earthTexture);
+  const earthNormalData = await loadTexture(img, canvasT, ctxT, "earth_normal.tiff");
+  const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
+  // TODO: remove
+  const testData = await loadTexture(img, canvasT, ctxT, "test_normal3.jpg");
+  const testNormal = new Texture(testData, canvasT.width, canvasT.height);
+  const earth = new Sphere(0, 0, 0, 2, 255, 255, 255, true, true, false, earthTexture, earthNormal);
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
-  earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), Math.PI / 10); // Earth's rotation
-  earth.scale(2, 2, 2);
-  */
-  const earth = new Sphere(0, 0, 0, 1, 0, 0, 255, true, true, true);
-  earth.scale(2, 1, 1);
-  earth.rotate(vec3.fromValues(0, 0, 1), -Math.PI / 6);
-  earth.translate(-2, 0, -2);
+  earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), -Math.PI / 6); // Earth's rotation
   objects.push(earth);
 
   /*
