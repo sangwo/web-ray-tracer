@@ -120,16 +120,15 @@ function computeAmbient(color) {
   return ambient;
 }
 
-// Given normal, view direcion, and light direction, compute and return specular
-// component (Phong shading) as an array
-function computeSpecular(normal, viewDirection, lightDirection) {
+// Given specular color, normal, view direcion, and light direction, compute and
+// return specular component (Phong shading) as an array
+function computeSpecular(specularColor, normal, viewDirection, lightDirection) {
   const halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
       viewDirection, lightDirection));
-  const specularColor = [255, 255, 255];
   const specularLightIntensity = [255, 255, 255].map(function(x) {
     return x / 255;
   });
-  const shininess = 300; // Phong exponent
+  const shininess = 50; // Phong exponent
   let specular = [];
   for (let c = 0; c < 3; c++) {
     specular[c] = specularColor[c] * specularLightIntensity[c] *
@@ -188,6 +187,7 @@ function subpixelColor(ray, objects) {
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
     const color = closest.colorAt(transPoint);
+    const specularColor = closest.specularColorAt(transPoint);
 
     const ambient = computeAmbient(color); // independent of light
     let [diffuse, specular, shadow] = [[], [], []];
@@ -205,7 +205,7 @@ function subpixelColor(ray, objects) {
 
           // intermediates
           const diffuseI = computeDiffuse(color, normal, lightDirection);
-          const specularI = computeSpecular(normal, viewDirection, lightDirection);
+          const specularI = computeSpecular(specularColor, normal, viewDirection, lightDirection);
           const shadowI = isInShadow(point, normal, lightDirection, objects);
 
           // accumulate
@@ -230,7 +230,7 @@ function subpixelColor(ray, objects) {
           vec3.subtract(vec3.create(), light.position, point));
 
       diffuse = computeDiffuse(color, normal, lightDirection);
-      specular = computeSpecular(normal, viewDirection, lightDirection);
+      specular = computeSpecular(specularColor, normal, viewDirection, lightDirection);
       shadow = isInShadow(point, normal, lightDirection, objects);
     }
     // compute final color of the sub-pixel
@@ -311,12 +311,11 @@ async function render() {
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
   const earthNormalData = await loadTexture(img, canvasT, ctxT, "earth_normal.tiff");
   const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
-  // TODO: remove
-  const testData = await loadTexture(img, canvasT, ctxT, "test_normal3.jpg");
-  const testNormal = new Texture(testData, canvasT.width, canvasT.height);
-  const earth = new Sphere(0, 0, 0, 2, 255, 255, 255, true, true, false, earthTexture, earthNormal);
+  const earthSpecularData = await loadTexture(img, canvasT, ctxT, "earth_specular.tiff");
+  const earthSpecular = new Texture(earthSpecularData, canvasT.width, canvasT.height);
+  const earth = new Sphere(0, 0, 0, 2, 255, 255, 255, true, true, true, earthTexture, earthNormal, earthSpecular);
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
-  earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), -Math.PI / 6); // Earth's rotation
+  earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), Math.PI / 6); // Earth's rotation
   objects.push(earth);
 
   /*
@@ -350,6 +349,7 @@ $(document).ready(function() {
   // TODO: for debugging
   $("#submit-button").on("click", function() {
     try {
+
       render();
     } catch(err) {
       //alert(err);

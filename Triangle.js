@@ -23,6 +23,13 @@ export class Triangle {
     return this.color;
   }
 
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // specular color at that point
+  specularColorAt(point) {
+    // TODO: add case for specular map
+    return [255, 255, 255];
+  }
+
   // Given a point and ray direction as vec3 objects, return the normal of the
   // plane containing the triangle as a vec3 object
   normal(point, rayDirection) {

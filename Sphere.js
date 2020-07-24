@@ -7,10 +7,11 @@ export class Sphere {
   // Given x, y, z coordinates, radius, color values r, g, b, whether diffuse,
   // ambient, specular components are on, and optionally a Texture object,
   // construct an unit sphere centered at origin (possibly transformed)
-  constructor(x, y, z, radius, r, g, b, diffuseOn, ambientOn, specularOn, texture=null, normalMap=null) {
+  constructor(x, y, z, radius, r, g, b, diffuseOn, ambientOn, specularOn, texture=null, normalMap=null, specularMap=null) {
     this.color = [r, g, b];
     this.texture = texture;
     this.normalMap = normalMap;
+    this.specularMap = specularMap;
     this.diffuseOn = diffuseOn;
     this.ambientOn = ambientOn;
     this.specularOn = specularOn;
@@ -37,6 +38,24 @@ export class Sphere {
       return this.texture.colorAt(u, v);
     }
     return this.color;
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // specular color at that point
+  specularColorAt(point) {
+    if (this.specularMap != null) {
+      // TODO: repetitive
+      // compute u, v
+      const theta = Math.acos(point[1]);
+      let phi = Math.atan2(point[2], -point[0]);
+      if (phi < 0) {
+        phi = phi + 2 * Math.PI;
+      }
+      const u = phi / (2 * Math.PI)
+      const v = (Math.PI - theta) / Math.PI;
+      return this.texture.colorAt(u, v);
+    }
+    return [255, 255, 255];
   }
 
   // Given a point and ray direction as vec3 objects, return the normal at the
