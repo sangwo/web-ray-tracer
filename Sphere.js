@@ -7,6 +7,7 @@ export class Sphere {
   // Given x, y, z coordinates, radius, color values r, g, b, whether diffuse,
   // ambient, specular components are on, and optionally a Texture object,
   // construct an unit sphere centered at origin (possibly transformed)
+  // TODO: change arguments to setters
   constructor(x, y, z, radius, r, g, b, diffuseOn, ambientOn, specularOn, texture=null, normalMap=null, specularMap=null) {
     this.color = [r, g, b];
     this.texture = texture;
@@ -17,25 +18,54 @@ export class Sphere {
     this.specularOn = specularOn;
     this.transform = mat4.create(); // identity matrix
     this.inverseTransform = mat4.create(); // inverse identity matrix
+    this.reflective = 0;
+    this.transparent = 0;
+    this.ior = 1; // index of refraction
 
     // transform according to x, y, z and radius
     this.scale(radius, radius, radius);
     this.translate(x, y, z);
   }
 
+  // Given a transparency coefficient in the range between 0 and 1 and index of
+  // refraction, set the object's transparency and index of refraction
+  transparency(kt, ior) {
+    if (kt < 0 || kt > 1) {
+      throw new RangeError("The argument must be between 0 and 1");
+    }
+    this.transparent = kt;
+    this.ior = ior;
+  }
+
+  // Given a reflectivity coefficient in the range between 0 and 1, set the
+  // object's reflectivity
+  reflectivity(ks) {
+    if (ks < 0 || ks > 1) {
+      throw new RangeError("The argument must be between 0 and 1");
+    }
+    this.reflective = ks;
+  }
+
+  // Given a point as a vec3 object, compute and return a texture coordinate u,
+  // v as an array
+  // TODO: array vs. vec2
+  getUV(point) {
+    const theta = Math.acos(point[1]);
+    let phi = Math.atan2(point[2], -point[0]);
+    if (phi < 0) {
+      phi = phi + 2 * Math.PI;
+    }
+    const u = phi / (2 * Math.PI)
+    const v = (Math.PI - theta) / Math.PI;
+    return [u, v];
+  }
+
   // Given a point as a vec3 object, return an array of color values r, g, b at
   // that point
   colorAt(point) {
     if (this.texture != null) {
-      // compute u, v
-      const theta = Math.acos(point[1]);
-      let phi = Math.atan2(point[2], -point[0]);
-      if (phi < 0) {
-        phi = phi + 2 * Math.PI;
-      }
-      const u = phi / (2 * Math.PI)
-      const v = (Math.PI - theta) / Math.PI;
-      return this.texture.colorAt(u, v);
+      const uv = this.getUV(point);
+      return this.texture.colorAt(uv[0], uv[1]);
     }
     return this.color;
   }
@@ -44,16 +74,8 @@ export class Sphere {
   // specular color at that point
   specularColorAt(point) {
     if (this.specularMap != null) {
-      // TODO: repetitive
-      // compute u, v
-      const theta = Math.acos(point[1]);
-      let phi = Math.atan2(point[2], -point[0]);
-      if (phi < 0) {
-        phi = phi + 2 * Math.PI;
-      }
-      const u = phi / (2 * Math.PI)
-      const v = (Math.PI - theta) / Math.PI;
-      return this.texture.colorAt(u, v);
+      const uv = this.getUV(point);
+      return this.specularMap.colorAt(uv[0], uv[1]);
     }
     return [255, 255, 255];
   }
@@ -63,32 +85,16 @@ export class Sphere {
   normal(point, rayDirection) {
     let normal = vec3.normalize(vec3.create(), point);
     if (this.normalMap != null) {
-      // TODO: repetitive
-      // compute u, v
-      const theta = Math.acos(point[1]);
-      let phi = Math.atan2(point[2], -point[0]);
-      if (phi < 0) {
-        phi = phi + 2 * Math.PI;
-      }
-      const u = phi / (2 * Math.PI)
-      const v = (Math.PI - theta) / Math.PI;
+      const uv = this.getUV(point);
 
       // convert rgb to normal in tangent space
-      const rgb = this.normalMap.colorAt(u, v).map(function(x) {
+      const rgb = this.normalMap.colorAt(uv[0], uv[1]).map(function(x) {
         return 2 * x - 255;
       });
       const normalTangentSpace = vec3.fromValues(rgb[0], rgb[1], rgb[2]);
       vec3.normalize(normalTangentSpace, normalTangentSpace);
 
       // compute tbn matrix
-      /*
-      // TODO: repetitive
-      let t = vec3.fromValues(0, 1, 0); // any vector not collinear with normal
-      if (vec3.equals(normal, t)) {
-        t = vec3.fromValues(0, 0, 1);
-      }
-      const tangent = vec3.cross(vec3.create(), t, normal);
-      */
       const tangent = vec3.fromValues(Math.sin(phi), 0, Math.cos(phi));
       const bitangent = vec3.cross(vec3.create(), normal, tangent);
       const tbn = mat3.fromValues(
