@@ -19,7 +19,7 @@ export class Sphere {
     this.transform = mat4.create(); // identity matrix
     this.inverseTransform = mat4.create(); // inverse identity matrix
     this.reflective = 0;
-    this.transparent = 0;
+    this.transparent = 0; // amount of light allowed to go through
     this.ior = 1; // index of refraction
 
     // transform according to x, y, z and radius

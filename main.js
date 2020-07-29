@@ -111,7 +111,7 @@ function computeDiffuse(color, normal, lightDirection) {
 // Given an array of color values r, g, b at the point, compute and return
 // ambient component as an array in the range between 0 and 1
 function computeAmbient(color) {
-  const ambientLightIntensity = [150, 150, 150];
+  const ambientLightIntensity = [255, 255, 255];
   let ambient = [];
   for (let c = 0; c < 3; c++) {
     ambient[c] = (color[c] / 255) * (ambientLightIntensity[c] / 255);
@@ -127,7 +127,7 @@ function computeSpecular(specularColor, normal, viewDirection, lightDirection) {
       viewDirection, lightDirection));
   const specularLightIntensity = [255, 255, 255];
   // TODO: add as an argument; 50 for the Earth
-  const shininess = 400; // Phong exponent
+  const shininess = 200; // Phong exponent
   let specular = [];
   for (let c = 0; c < 3; c++) {
     specular[c] = (specularColor[c] / 255) * (specularLightIntensity[c] / 255) *
@@ -151,7 +151,15 @@ function isInShadow(point, normal, lightPosition, lightDirection, objects) {
   // intersects with an object in-between the point and the light
   const tLight = vec3.distance(point, lightPosition);
   const shadowObj = closestIntersectObj(objects, shadowRay, tLight);
-  return shadowObj == null;
+
+  const inShadow = shadowObj != null;
+  // TODO: shadow of transparent objects (possibly recursive)
+  /*
+  if (inShadow && shadowObj.transparent) {
+    return shadowObj.transparent;
+  }
+  */
+  return !inShadow;
 }
 
 // Given an object, array of ambient, diffuse, specualr that contains r, g, b
@@ -178,15 +186,15 @@ function reflect(rayDirection, normal) {
 // and return a direction of refracted ray
 function refract(rayDirection, normal, ior) {
   let cosi = vec3.dot(rayDirection, normal);
-  const etaOut = 1;
-  const etaIn = ior;
-  let eta = etaOut / etaIn;
+  let etaOut = 1;
+  let etaIn = ior;
   if (cosi < 0) {
     cosi = -cosi;
   } else { // ray hits from inside the object
-    eta = 1 / eta; // swap etaOut and etaIn
+    [etaOut, etaIn] = [etaIn, etaOut]; // swap etaOut and etaIn
     vec3.negate(normal, normal);
   }
+  const eta = etaOut / etaIn;
 
   const determinant = 1 - eta * eta * (1 - cosi * cosi);
   if (determinant < 0) { // total internal reflection
@@ -194,6 +202,31 @@ function refract(rayDirection, normal, ior) {
   }
   return vec3.add(vec3.create(), vec3.scale(vec3.create(), rayDirection, eta),
       vec3.scale(vec3.create(), normal, eta * cosi - Math.sqrt(determinant)));
+}
+
+// Given a ray directon, normal, and the object's index of refraction, compute
+// and return reflectance following the Schlick's approximation
+function schlick(rayDirection, normal, ior) {
+  // TODO: repetitive
+  let cosi = vec3.dot(rayDirection, normal);
+  let etaOut = 1;
+  let etaIn = ior;
+  if (cosi < 0) {
+    cosi = -cosi;
+  } else { // ray hits from inside the object
+    [etaOut, etaIn] = [etaIn, etaOut]; // swap etaOut and etaIn
+    vec3.negate(normal, normal);
+  }
+  const eta = etaOut / etaIn;
+
+  const determinant = 1 - eta * eta * (1 - cosi * cosi);
+  if (determinant < 0) { // total internal reflection
+    return 1; // all reflection, no refraction
+  } else {
+    let r0 = (etaOut - etaIn) / (etaOut + etaIn);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * Math.pow((1 - cosi), 5);
+  }
 }
 
 // Given a ray, array of objects, and recursion depth, return the color of
@@ -277,9 +310,39 @@ function subpixelColor(ray, objects, recursionDepth) {
 
     // reflection and refraction
     if (recursionDepth < MAX_RECURSION) {
+      if (closest.transparent && closest.reflective) { // TODO: implemenet "dielectric" object type
+        // compute fresnel (schlick's approximation)
+        const reflectance = schlick(ray.direction, normal, closest.ior);
+
+        const rayFromOutside = vec3.dot(ray.direction, normal) < 0;
+        let refractedColor = [0, 0, 0];
+        if (reflectance < 1) { // no total internal reflection
+          // cast refraction ray
+          const refractOrigin = rayFromOutside ? biasedPoint(point, normal,
+              -Math.pow(10, -4)) : biasedPoint(point, normal, Math.pow(10, -4));
+          const refractDirection = refract(ray.direction, normal, closest.ior);
+          const refractRay = new Ray(refractOrigin, refractDirection);
+          refractedColor = subpixelColor(refractRay, objects, recursionDepth + 1);
+        }
+        // cast reflection ray
+        const reflectOrigin = rayFromOutside ? biasedPoint(point, normal,
+            Math.pow(10, -4)) : biasedPoint(point, normal, -Math.pow(10, -4));
+        const reflectDirection = reflect(ray.direction, normal);
+        const reflectRay = new Ray(reflectOrigin, reflectDirection);
+        const reflectedColor = subpixelColor(reflectRay, objects, recursionDepth + 1);
+
+        // combine reflected and refracted color and accumulate
+        for (let c = 0; c < 3; c++) {
+          resultColor[c] += reflectance * (reflectedColor[c] / 255) + (1 - reflectance) * (refractedColor[c] / 255);
+        }
+      }
+
+      /*
       if (closest.reflective) {
         // compute reflection ray
-        const reflectOrigin = biasedPoint(point, normal, Math.pow(10, -4));
+        const rayFromOutside = vec3.dot(ray.direction, normal) < 0;
+        const reflectOrigin = rayFromOutside ? biasedPoint(point, normal,
+            Math.pow(10, -4)) : biasedPoint(point, normal, -Math.pow(10, -4));
         const reflectDirection = reflect(ray.direction, normal);
         const reflectRay = new Ray(reflectOrigin, reflectDirection);
 
@@ -304,6 +367,7 @@ function subpixelColor(ray, objects, recursionDepth) {
           resultColor[c] += closest.transparent * (refractedColor[c] / 255);
         }
       }
+      */
     }
   }
 
@@ -373,12 +437,12 @@ async function loadTexture(img, canvas, ctx, fileName) {
 async function render() {
   let objects = [];
 
-  /*
   // prepare to load textures
   const img = new Image();
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
+  /*
   // load textures and add objects
   // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
@@ -398,19 +462,14 @@ async function render() {
   objects.push(new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false, starTexture)); // TODO: make it bigger
   */
 
-  const testObj = new Sphere(2, 0, -3, 1, 0, 0, 255, true, false, true);
-  //const testObj = new Sphere(2, 0, 1, 1, 0, 0, 255, true, false, true);
-  objects.push(testObj);
-  const testObj2 = new Sphere(0, 0, 1, 1, 255, 0, 0, false, false, false);
-  testObj2.transparency(1, 1);
-  //testObj2.reflectivity(1);
-  //objects.push(testObj2);
-  const more = new Sphere(-1, 0, -3, 1, 0, 255, 0, true, false, true);
-  objects.push(more);
-  const more2 = new Sphere(0, 0, -3, 1, 255, 0, 0, true, false, true);
-  objects.push(more2);
-  //const more = new Sphere(0, -2, 1, 1, 0, 255, 0, true, false, true);
-  //objects.push(more);
+  const skyData = await loadTexture(img, canvasT, ctxT, "sky.jpg");
+  const skyTexture = new Texture(skyData, canvasT.width, canvasT.height);
+  objects.push(new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false, skyTexture));
+
+  const test = new Sphere(0, 0, 0, 1, 255, 0, 0, false, false, true);
+  test.transparency(1, 1.5);
+  test.reflectivity(1);
+  objects.push(test);
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
