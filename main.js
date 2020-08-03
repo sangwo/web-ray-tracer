@@ -8,8 +8,8 @@ import * as util from "./utility.js";
 
 const light = new Light(
   vec3.fromValues(-1, 0, 6),      // corner
-  vec3.fromValues(2, 0, 0), 2,    // uvecFull, usteps
-  vec3.fromValues(0, 2, 0), 2,    // vvecFull, vsteps
+  vec3.fromValues(2, 0, 0), 6,    // uvecFull, usteps
+  vec3.fromValues(0, 2, 0), 6,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
 );
 const l = -2;   // position of the left edge of the image
@@ -108,26 +108,23 @@ function computeDiffuse(color, normal, lightDirection) {
   return diffuse;
 }
 
-// Given an array of color values r, g, b at the point, compute and return
-// ambient component as an array in the range between 0 and 1
-function computeAmbient(color) {
+// Given an ambient color as an array of color values r, g, b, compute and
+// return ambient component as an array in the range between 0 and 1
+function computeAmbient(ambientColor) {
   const ambientLightIntensity = [255, 255, 255];
   let ambient = [];
   for (let c = 0; c < 3; c++) {
-    ambient[c] = (color[c] / 255) * (ambientLightIntensity[c] / 255);
+    ambient[c] = (ambientColor[c] / 255) * (ambientLightIntensity[c] / 255);
   }
   return ambient;
 }
 
-// Given specular color, normal, view direcion, and light direction, compute and
-// return specular component (Phong shading) as an array in the range between 0
-// and 1
-function computeSpecular(specularColor, normal, viewDirection, lightDirection) {
+// Given a specular color as an array of color values r, g, b, shininess,
+// normal, view direcion, and light direction, compute and return specular
+// component (Phong shading) as an array in the range between 0 and 1
+function computeSpecular(specularColor, specularLightIntensity, shininess, normal, viewDirection, lightDirection) {
   const halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
       viewDirection, lightDirection));
-  const specularLightIntensity = [255, 255, 255];
-  // TODO: add as an argument; 50 for the Earth
-  const shininess = 200; // Phong exponent
   let specular = [];
   for (let c = 0; c < 3; c++) {
     specular[c] = (specularColor[c] / 255) * (specularLightIntensity[c] / 255) *
@@ -165,7 +162,6 @@ function isInShadow(point, normal, lightPosition, lightDirection, objects) {
 // Given an object, array of ambient, diffuse, specualr that contains r, g, b
 // values, and shadow value between 0 and 1, return the array of final color
 // (not clamped yet)
-// TODO: remove?
 function computeFinalColor(closest, ambient, diffuse, specular, shadow) {
   let finalColor = [];
   for (let c = 0; c < 3; c++) {
@@ -215,7 +211,6 @@ function schlick(rayDirection, normal, ior) {
     cosi = -cosi;
   } else { // ray hits from inside the object
     [etaOut, etaIn] = [etaIn, etaOut]; // swap etaOut and etaIn
-    vec3.negate(normal, normal);
   }
   const eta = etaOut / etaIn;
 
@@ -257,9 +252,12 @@ function subpixelColor(ray, objects, recursionDepth) {
     const viewDirection = vec3.normalize(vec3.create(),
         vec3.subtract(vec3.create(), ray.origin, point));
     const color = closest.colorAt(transPoint);
+    const ambientColor = closest.ambientColorAt(transPoint);
     const specularColor = closest.specularColorAt(transPoint);
+    const specularLight = closest.specularLightAt(transPoint);
+    const shininess = closest.shininess;
 
-    const ambient = computeAmbient(color); // independent of light
+    const ambient = computeAmbient(ambientColor); // independent of light
     let diffuse = [];
     let specular = [];
     let shadow;
@@ -277,7 +275,7 @@ function subpixelColor(ray, objects, recursionDepth) {
 
           // intermediates
           const diffuseI = computeDiffuse(color, normal, lightDirection);
-          const specularI = computeSpecular(specularColor, normal, viewDirection, lightDirection);
+          const specularI = computeSpecular(specularColor, specularLight, shininess, normal, viewDirection, lightDirection);
           const shadowI = isInShadow(point, normal, lightPoint, lightDirection, objects);
 
           // accumulate
@@ -302,19 +300,32 @@ function subpixelColor(ray, objects, recursionDepth) {
           vec3.subtract(vec3.create(), light.position, point));
 
       diffuse = computeDiffuse(color, normal, lightDirection);
-      specular = computeSpecular(specularColor, normal, viewDirection, lightDirection);
+      specular = computeSpecular(specularColor, specularLight, shininess, normal, viewDirection, lightDirection);
       shadow = isInShadow(point, normal, light.position, lightDirection, objects);
     }
     // compute final color of the sub-pixel
     resultColor = computeFinalColor(closest, ambient, diffuse, specular, shadow);
 
     // reflection and refraction
+    // TODO: early termination if no significant color contribution
     if (recursionDepth < MAX_RECURSION) {
-      if (closest.transparent && closest.reflective) { // TODO: implemenet "dielectric" object type
+      // TODO: implement different materials
+      const transparent = closest.getTransparency(transPoint);
+      const reflective = closest.getReflectivity(transPoint);
+
+      if (transparent && reflective) { // TODO: implemenet "dielectric" object type
         // compute fresnel (schlick's approximation)
         const reflectance = schlick(ray.direction, normal, closest.ior);
 
+        // compute light attenuation according to beer's law
         const rayFromOutside = vec3.dot(ray.direction, normal) < 0;
+        let absorb = [1, 1, 1];
+        if (!rayFromOutside) { // ray inside the object
+          absorb = closest.colorFilter.map(function(x) {
+            return Math.pow(x, tVal);
+          });
+        }
+
         let refractedColor = [0, 0, 0];
         if (reflectance < 1) { // no total internal reflection
           // cast refraction ray
@@ -333,12 +344,15 @@ function subpixelColor(ray, objects, recursionDepth) {
 
         // combine reflected and refracted color and accumulate
         for (let c = 0; c < 3; c++) {
-          resultColor[c] += reflectance * (reflectedColor[c] / 255) + (1 - reflectance) * (refractedColor[c] / 255);
+          resultColor[c] += absorb[c] * (reflectance * (reflectedColor[c] / 255) +
+              (1 - reflectance) * (refractedColor[c] / 255));
+          // TODO: should multiply by reflectivity and transparency?
+          //resultColor[c] += reflectance * closest.reflective * (reflectedColor[c] / 255) +
+          //    (1 - reflectance) * closest.transparent * (refractedColor[c] / 255);
         }
       }
 
-      /*
-      if (closest.reflective) {
+      else if (reflective) {
         // compute reflection ray
         const rayFromOutside = vec3.dot(ray.direction, normal) < 0;
         const reflectOrigin = rayFromOutside ? biasedPoint(point, normal,
@@ -349,11 +363,11 @@ function subpixelColor(ray, objects, recursionDepth) {
         // cast reflection ray and accumulate reflected color
         const reflectedColor = subpixelColor(reflectRay, objects, recursionDepth + 1);
         for (let c = 0; c < 3; c++) {
-          resultColor[c] += 0.8 * closest.reflective * (reflectedColor[c] / 255); // TODO: remove 0.8?
+          resultColor[c] += 0.8 * reflective * (reflectedColor[c] / 255); // TODO: remove 0.8?
         }
       }
 
-      if (closest.transparent) {
+      else if (transparent) {
         // compute refraction (transmittance) ray
         const rayFromOutside = vec3.dot(ray.direction, normal) < 0;
         const refractOrigin = rayFromOutside ? biasedPoint(point, normal,
@@ -364,10 +378,9 @@ function subpixelColor(ray, objects, recursionDepth) {
         // cast refraction ray and accumulate refracted color
         const refractedColor = subpixelColor(refractRay, objects, recursionDepth + 1);
         for (let c = 0; c < 3; c++) {
-          resultColor[c] += closest.transparent * (refractedColor[c] / 255);
+          resultColor[c] += transparent * (refractedColor[c] / 255);
         }
       }
-      */
     }
   }
 
@@ -442,8 +455,6 @@ async function render() {
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
-  /*
-  // load textures and add objects
   // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
@@ -451,25 +462,15 @@ async function render() {
   const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
   const earthSpecularData = await loadTexture(img, canvasT, ctxT, "earth_specular.tiff");
   const earthSpecular = new Texture(earthSpecularData, canvasT.width, canvasT.height);
-  const earth = new Sphere(0, 0, 0, 2, 255, 255, 255, true, true, true, earthTexture, earthNormal, earthSpecular);
+  const earth = new Sphere(0, 0, 0, 2, 0, 70, 160, true, true, true);
+  earth.setTexture(earthTexture);
+  earth.setNormalMap(earthNormal);
+  earth.setSpecularMap(earthSpecular);
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
   earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), -Math.PI / 3); // Earth's rotation
+  earth.setSpecularColor(150, 150, 150);
+  earth.setShininess(50);
   objects.push(earth);
-
-  // starfield
-  const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
-  const starTexture = new Texture(starData, canvasT.width, canvasT.height);
-  objects.push(new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false, starTexture)); // TODO: make it bigger
-  */
-
-  const skyData = await loadTexture(img, canvasT, ctxT, "sky.jpg");
-  const skyTexture = new Texture(skyData, canvasT.width, canvasT.height);
-  objects.push(new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false, skyTexture));
-
-  const test = new Sphere(0, 0, 0, 1, 255, 0, 0, false, false, true);
-  test.transparency(1, 1.5);
-  test.reflectivity(1);
-  objects.push(test);
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
