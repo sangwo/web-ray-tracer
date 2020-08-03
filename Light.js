@@ -20,8 +20,8 @@ export class Light {
       vec3.scale(vec3.create(), uvecFull, 1 / 2)),
       vec3.scale(vec3.create(), vvecFull, 1 / 2)); // center
     */
-    //this.position = vec3.fromValues(0, 5, 0); // TODO: remove
-    this.position = vec3.fromValues(0, 3, 5); // TODO: remove
+    this.position = vec3.fromValues(0, 5, 0); // TODO: remove
+    //this.position = vec3.fromValues(0, 3, 5); // TODO: remove
     this.color = [r, g, b];
     // TODO: add as an argument
     this.diffuseOn = false;

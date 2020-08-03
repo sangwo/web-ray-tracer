@@ -7,7 +7,7 @@ import { Texture } from "./Texture.js";
 import * as util from "./utility.js";
 
 const light = new Light(
-  vec3.fromValues(-1, 0, 6),      // corner
+  vec3.fromValues(-1, 0, 5),      // corner
   vec3.fromValues(2, 0, 0), 6,    // uvecFull, usteps
   vec3.fromValues(0, 2, 0), 6,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
@@ -21,7 +21,7 @@ const ny = 500; // canvas height
 const d = 8;    // distance from origin to the image
 const samplingWidth = 4; // = sampling height (NxN)
 const backgroundColor = [255, 255, 255];
-const MAX_RECURSION = 4;
+const MAX_RECURSION = 3; // TODO: change to 4
 
 // shading option
 let softShadowOn = false;
@@ -139,24 +139,54 @@ function biasedPoint(point, normal, bias) {
   return vec3.add(vec3.create(), point, vec3.scale(vec3.create(), normal, bias));
 }
 
-// Given a point, normal, light position, light direction as vec3 objects and an
-// array of objects, return 0 if the point is in shadow, 1 otherwise
-function isInShadow(point, normal, lightPosition, lightDirection, objects) {
-  // to avoid shadow-acne
-  const overPoint = biasedPoint(point, normal, Math.pow(10, -4));
-  const shadowRay = new Ray(overPoint, lightDirection);
+// Given a shadow ray, t value of the intersection between the shadow ray and
+// light, light direction, and an array of objects, compute and return shadow
+// attenuation as an array of r, g, b values
+// TODO: add condition for terminating recursion; if all light is absorbed
+function isInShadow(shadowRay, tLight, lightDirection, objects) {
   // intersects with an object in-between the point and the light
-  const tLight = vec3.distance(point, lightPosition);
   const shadowObj = closestIntersectObj(objects, shadowRay, tLight);
-
   const inShadow = shadowObj != null;
-  // TODO: shadow of transparent objects (possibly recursive)
-  /*
-  if (inShadow && shadowObj.transparent) {
-    return shadowObj.transparent;
+  let attenuation = [1, 1, 1];
+  if (inShadow) {
+    attenuation = [0, 0, 0];
+
+    // find the object's transparency at the point of intersection
+    // TODO: repetitive (ray -> shadowRay, closest -> shadowObj)
+    // transform the ray according to the object's inverse transformation matrix
+    const transOrigin = util.transformPosition(shadowRay.origin, shadowObj.inverseTransform);
+    const transDirection = util.transformDirection(shadowRay.direction, shadowObj.inverseTransform);
+    const transRay = new Ray(transOrigin, transDirection);
+
+    // compute intersection of the (transformed) ray and the untransformed object
+    const tVal = shadowObj.intersects(shadowRay);
+    const transPoint = transRay.pointAtParameter(tVal);
+
+    // cast a new shadow ray if the object is transparent
+    const transparent = shadowObj.getTransparency(transPoint);
+    if (transparent) {
+      // TODO: dirty code
+      const transNormal = shadowObj.normal(transPoint, transRay.direction);
+
+      // transform back to get intersection of the original ray and the transformed object
+      const point = util.transformPosition(transPoint, shadowObj.transform);
+      let normal = util.transformDirection(transNormal, mat4.transpose(mat4.create(), shadowObj.inverseTransform));
+      vec3.normalize(normal, normal);
+
+      // compute new shadow ray
+      const rayFromOutside = vec3.dot(shadowRay.direction, normal) < 0;
+      const biased = rayFromOutside ? biasedPoint(point, normal,
+          -Math.pow(10, -4)) : biasedPoint(point, normal, Math.pow(10, -4));
+      const newShadowRay = new Ray(biased, lightDirection);
+
+      // compute shadow attenuation
+      const recurseAtten = isInShadow(newShadowRay, tLight - tVal, lightDirection, objects);
+      for (let c = 0; c < 3; c++) {
+        attenuation[c] = transparent * shadowObj.colorFilter[c] * recurseAtten[c];
+      }
+    }
   }
-  */
-  return !inShadow;
+  return attenuation;
 }
 
 // Given an object, array of ambient, diffuse, specualr that contains r, g, b
@@ -165,7 +195,7 @@ function isInShadow(point, normal, lightPosition, lightDirection, objects) {
 function computeFinalColor(closest, ambient, diffuse, specular, shadow) {
   let finalColor = [];
   for (let c = 0; c < 3; c++) {
-    finalColor[c] = shadow * (closest.diffuseOn * diffuse[c] +
+    finalColor[c] = shadow[c] * (closest.diffuseOn * diffuse[c] +
         closest.specularOn * specular[c]) + closest.ambientOn * ambient[c];
   }
   return finalColor;
@@ -256,17 +286,18 @@ function subpixelColor(ray, objects, recursionDepth) {
     const specularColor = closest.specularColorAt(transPoint);
     const specularLight = closest.specularLightAt(transPoint);
     const shininess = closest.shininess;
+    const overPoint = biasedPoint(point, normal, Math.pow(10, -4)); // for shadow
 
     const ambient = computeAmbient(ambientColor); // independent of light
     let diffuse = [];
     let specular = [];
-    let shadow;
+    let shadow = [];
     if (softShadowOn) {
       // for each sampling point in area light, compute diffuse, specular, and
       // shadow and accumulate
       let totalDiffuse = [0, 0, 0];
       let totalSpecular = [0, 0, 0];
-      let totalShadow = 0;
+      let totalShadow = [0, 0, 0];
       for (let uc = 0; uc < light.usteps; uc++) {
         for (let vc = 0; vc < light.vsteps; vc++) {
           const lightPoint = light.pointAt(uc, vc);
@@ -276,14 +307,17 @@ function subpixelColor(ray, objects, recursionDepth) {
           // intermediates
           const diffuseI = computeDiffuse(color, normal, lightDirection);
           const specularI = computeSpecular(specularColor, specularLight, shininess, normal, viewDirection, lightDirection);
-          const shadowI = isInShadow(point, normal, lightPoint, lightDirection, objects);
+          // shadow
+          const shadowRayI = new Ray(overPoint, lightDirection);
+          const tLightI = vec3.distance(point, lightPoint);
+          const shadowI = isInShadow(shadowRayI, tLightI, lightDirection, objects);
 
           // accumulate
           for (let c = 0; c < 3; c++) {
             totalDiffuse[c] += diffuseI[c];
             totalSpecular[c] += specularI[c];
+            totalShadow[c] += shadowI[c];
           }
-          totalShadow += shadowI;
         }
       }
       // compute average diffuse, specular, and shadow
@@ -293,7 +327,9 @@ function subpixelColor(ray, objects, recursionDepth) {
       for (let c = 0; c < 3; c++) {
         specular[c] = totalSpecular[c] / light.samples;
       }
-      shadow = totalShadow / light.samples;
+      for (let c = 0; c < 3; c++) {
+        shadow[c] = totalShadow[c] / light.samples;
+      }
     } else {
       // treat area light as point light
       const lightDirection = vec3.normalize(vec3.create(),
@@ -301,7 +337,10 @@ function subpixelColor(ray, objects, recursionDepth) {
 
       diffuse = computeDiffuse(color, normal, lightDirection);
       specular = computeSpecular(specularColor, specularLight, shininess, normal, viewDirection, lightDirection);
-      shadow = isInShadow(point, normal, light.position, lightDirection, objects);
+      // shadow
+      const shadowRay = new Ray(overPoint, lightDirection);
+      const tLight = vec3.distance(point, light.position);
+      shadow = isInShadow(shadowRay, tLight, lightDirection, objects);
     }
     // compute final color of the sub-pixel
     resultColor = computeFinalColor(closest, ambient, diffuse, specular, shadow);
@@ -310,6 +349,7 @@ function subpixelColor(ray, objects, recursionDepth) {
     // TODO: early termination if no significant color contribution
     if (recursionDepth < MAX_RECURSION) {
       // TODO: implement different materials
+      // TODO: sort out repetitive code
       const transparent = closest.getTransparency(transPoint);
       const reflective = closest.getReflectivity(transPoint);
 
@@ -348,7 +388,7 @@ function subpixelColor(ray, objects, recursionDepth) {
               (1 - reflectance) * (refractedColor[c] / 255));
           // TODO: should multiply by reflectivity and transparency?
           //resultColor[c] += reflectance * closest.reflective * (reflectedColor[c] / 255) +
-          //    (1 - reflectance) * closest.transparent * (refractedColor[c] / 255);
+          //    (1 - reflectance) * transparent * (refractedColor[c] / 255);
         }
       }
 
@@ -455,6 +495,7 @@ async function render() {
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
+  /*
   // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
@@ -471,6 +512,38 @@ async function render() {
   earth.setSpecularColor(150, 150, 150);
   earth.setShininess(50);
   objects.push(earth);
+  */
+
+  const sky = new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false);
+  const skyData = await loadTexture(img, canvasT, ctxT, "sky.jpg");
+  const skyTexture = new Texture(skyData, canvasT.width, canvasT.height);
+  sky.setTexture(skyTexture);
+  sky.setAmbientPercent(1);
+  objects.push(sky);
+
+  const v0 = vec3.fromValues(-5, -1, 15);
+  const v1 = vec3.fromValues(-5, -1, -15);
+  const v2 = vec3.fromValues(5, -1, 15);
+  const v3 = vec3.fromValues(5, -1, -15);
+  const tri = new Triangle(v0, v1, v2, 250, 250, 250, true, false, false);
+  const tri2 = new Triangle(v1, v2, v3, 250, 250, 250, true, false, false);
+  objects.push(tri);
+  objects.push(tri2);
+
+  const glassBall = new Sphere(0, 0.5, 0, 1, 255, 255, 255, false, false, true);
+  glassBall.setTransparency(1, 1);
+  glassBall.setReflectivity(1);
+  glassBall.setColorFilter(0.9, 0, 0.9);
+  objects.push(glassBall);
+
+  const glassBall2 = new Sphere(0, 2, 0, 0.5, 255, 255, 255, false, false, true);
+  glassBall2.setTransparency(1, 1);
+  glassBall2.setReflectivity(1);
+  glassBall2.setColorFilter(0, 0.9, 0.9);
+  objects.push(glassBall2);
+
+  const left = new Sphere(-1, 0, -3, 1, 255, 0, 0, true, false, true);
+  //objects.push(left);
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
