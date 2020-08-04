@@ -14,14 +14,10 @@ export class Light {
     this.vvec = vec3.scale(vec3.create(), vvecFull, (1 / vsteps));
     this.vsteps = vsteps;
     this.samples = usteps * vsteps;
-    /*
     this.position = vec3.add(
       vec3.create(), vec3.add(vec3.create(), corner,
       vec3.scale(vec3.create(), uvecFull, 1 / 2)),
       vec3.scale(vec3.create(), vvecFull, 1 / 2)); // center
-    */
-    this.position = vec3.fromValues(0, 5, 0); // TODO: remove
-    //this.position = vec3.fromValues(0, 3, 5); // TODO: remove
     this.color = [r, g, b];
     // TODO: add as an argument
     this.diffuseOn = false;
@@ -37,8 +33,8 @@ export class Light {
     return this.color;
   }
 
-  // Given cell position uc, vc relative to corner, return jittered point in
-  // area light as a vec3 object
+  // Given a cell position uc, vc relative to the corner, return a jittered
+  // point in the area light as a vec3 object
   pointAt(uc, vc) {
     // jittered point = corner + uvec * (uc + random() * (uvec.length / usteps))
     //                         + vvec * (vc + random() * (vvec.length / vsteps))
@@ -49,7 +45,7 @@ export class Light {
     return vec3.add(vec3.create(), vec3.add(vec3.create(), this.corner, u), v);
   }
 
-  // Given a point and ray direction as vec3 objects, return the normal of the
+  // Given a point and a ray direction as vec3 objects, return a normal of the
   // plane containing the (rectangular) area light as a vec3 object
   normal(point, rayDirection) {
     const normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(),
@@ -65,8 +61,8 @@ export class Light {
     return negNormal;
   }
 
-  // Given a Ray object, return the t value for the intersection (null if the
-  // ray doesn’t intersect with the rectangle)
+  // Given a Ray object, return the t value of the intersection (null if the ray
+  // doesn’t intersect with the rectangle)
   intersects(ray) {
     const normal = this.normal(null, ray.direction);
 

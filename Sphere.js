@@ -6,13 +6,14 @@ import * as util from "./utility.js";
 export class Sphere {
   // Given x, y, z coordinates, radius, color values r, g, b, and whether
   // diffuse, ambient, specular components are on, construct an unit sphere
-  // centered at origin (possibly transformed)
+  // centered at origin transformed according to the coordinates and the radius
   constructor(x, y, z, radius, r, g, b, diffuseOn, ambientOn, specularOn) {
     // color
     this.color = [r, g, b];
     this.ambientPercent = 0.5;
     this.specularColor = [255, 255, 255];
     this.specularLight = [255, 255, 255];
+    this.reflectedColor = null; // glow
     // textures
     this.texture = null;
     this.normalMap = null;
@@ -34,133 +35,6 @@ export class Sphere {
     // transform according to x, y, z and radius
     this.scale(radius, radius, radius);
     this.translate(x, y, z);
-  }
-
-  // Given a color filter for each color channel (r, g, b), set it as the
-  // object's color filter
-  setColorFilter(cr, cg, cb) {
-    this.colorFilter = [cr, cg, cb];
-  }
-
-  // Given a shininess, set it as the object's shininess
-  setShininess(shininess) {
-    this.shininess = shininess;
-  }
-
-  // Given a point as a vec3 object, compute and return a texture coordinate u,
-  // v as an array
-  getUV(point) {
-    const theta = Math.acos(point[1]);
-    let phi = Math.atan2(point[2], -point[0]);
-    if (phi < 0) {
-      phi = phi + 2 * Math.PI;
-    }
-    const u = phi / (2 * Math.PI)
-    const v = (Math.PI - theta) / Math.PI;
-    return [u, v];
-  }
-
-  // Given a transparency coefficient in the range between 0 and 1 and index of
-  // refraction, set the object's transparency and index of refraction
-  setTransparency(kt, ior) {
-    if (kt < 0 || kt > 1) {
-      throw new RangeError("The argument must be between 0 and 1");
-    }
-    this.transparent = kt;
-    this.ior = ior;
-  }
-
-  // Given a Texture object, set the object's opacity map
-  setOpacityMap(opacityMap) {
-    this.opacityMap = opacityMap;
-  }
-
-  // Given a point as a vec3 object, return transparency at that point
-  getTransparency(point) {
-    if (this.opacityMap != null) {
-      const uv = this.getUV(point);
-      return 1 - (this.opacityMap.colorAt(uv[0], uv[1])[0] / 255);
-    }
-    return this.transparent;
-  }
-
-  // Given a reflectivity coefficient in the range between 0 and 1, set the
-  // object's reflectivity
-  setReflectivity(ks) {
-    if (ks < 0 || ks > 1) {
-      throw new RangeError("The argument must be between 0 and 1");
-    }
-    this.reflective = ks;
-  }
-
-  // Given a point as a vec3 object, return reflectivity at that point
-  getReflectivity(point) {
-    return this.reflective;
-  }
-
-  // Given a Texture object, set the object's texture
-  setTexture(texture) {
-    this.texture = texture;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b at
-  // that point
-  colorAt(point) {
-    if (this.texture != null) {
-      const uv = this.getUV(point);
-      return this.texture.colorAt(uv[0], uv[1]);
-    }
-    return this.color;
-  }
-
-  // Given a percentage to tone down the surface color to make an ambient color,
-  // set it as an ambient percent
-  setAmbientPercent(percent) {
-    this.ambientPercent = percent;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // ambient color at that point
-  ambientColorAt(point) {
-    // TODO: add case for ambient occlusion map?
-    const self = this;
-    if (this.texture != null) {
-      const surfaceColor = this.colorAt(point);
-      return surfaceColor.map(function(x) { return self.ambientPercent * x; });
-    }
-    return this.color.map(function(x) { return self.ambientPercent * x; });
-  }
-
-  // Given an array of color values r, g, b, set it as the object's specular
-  // color
-  setSpecularColor(r, g, b) {
-    this.specularColor = [r, g, b];
-  }
-
-  // Given a Texture object, set the object's specular map
-  setSpecularMap(specularMap) {
-    this.specularMap = specularMap;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // specular color at that point
-  specularColorAt(point) {
-    return this.specularColor;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // specular light at that point
-  specularLightAt(point) {
-    if (this.specularMap != null) {
-      const uv = this.getUV(point);
-      return this.specularMap.colorAt(uv[0], uv[1]);
-    }
-    return this.specularLight;
-  }
-
-  // Given a Texture object, set the object's normal map
-  setNormalMap(normalMap) {
-    this.normalMap = normalMap;
   }
 
   // Given a point and ray direction as vec3 objects, return the normal at the
@@ -221,6 +95,143 @@ export class Sphere {
     }
   }
 
+  /********** COLOR **********/
+  // Given a point as a vec3 object, return an array of color values r, g, b at
+  // that point
+  colorAt(point) {
+    if (this.texture != null) {
+      const uv = this.getUV(point);
+      return this.texture.colorAt(uv[0], uv[1]);
+    }
+    return this.color;
+  }
+
+  // Given a percentage to tone down the surface color to make an ambient color,
+  // set it as an ambient percent
+  setAmbientPercent(percent) {
+    this.ambientPercent = percent;
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // ambient color at that point
+  ambientColorAt(point) {
+    // TODO: add case for ambient occlusion map?
+    const self = this;
+    if (this.texture != null) {
+      const surfaceColor = this.colorAt(point);
+      return surfaceColor.map(function(x) { return self.ambientPercent * x; });
+    }
+    return this.color.map(function(x) { return self.ambientPercent * x; });
+  }
+
+  // Given an array of color values r, g, b, set it as the object's specular
+  // color
+  setSpecularColor(r, g, b) {
+    this.specularColor = [r, g, b];
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // specular color at that point
+  specularColorAt(point) {
+    return this.specularColor;
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // specular light at that point
+  specularLightAt(point) {
+    if (this.specularMap != null) {
+      const uv = this.getUV(point);
+      return this.specularMap.colorAt(uv[0], uv[1]);
+    }
+    return this.specularLight;
+  }
+
+  /********** SHADING OPTIONS **********/
+  // Given a shininess, set it as the object's shininess
+  setShininess(shininess) {
+    this.shininess = shininess;
+  }
+
+  /********** TEXTURES **********/
+  // Given a point as a vec3 object, compute and return a texture coordinate u,
+  // v as an array
+  getUV(point) {
+    const theta = Math.acos(point[1]);
+    let phi = Math.atan2(point[2], -point[0]);
+    if (phi < 0) {
+      phi = phi + 2 * Math.PI;
+    }
+    const u = phi / (2 * Math.PI)
+    const v = (Math.PI - theta) / Math.PI;
+    return [u, v];
+  }
+
+  // Given a Texture object, set the object's texture
+  setTexture(texture) {
+    this.texture = texture;
+  }
+
+  // Given a Texture object, set the object's normal map
+  setNormalMap(normalMap) {
+    this.normalMap = normalMap;
+  }
+
+  // Given a Texture object, set the object's specular map
+  setSpecularMap(specularMap) {
+    this.specularMap = specularMap;
+  }
+
+  // Given a Texture object, set the object's opacity map
+  setOpacityMap(opacityMap) {
+    this.opacityMap = opacityMap;
+  }
+
+  /********** REFLECTION/REFRACTION **********/
+  // Given a reflectivity coefficient in the range between 0 and 1, set the
+  // object's reflectivity
+  setReflectivity(ks) {
+    if (ks < 0 || ks > 1) {
+      throw new RangeError("The argument must be between 0 and 1");
+    }
+    this.reflective = ks;
+  }
+
+  // Given a point as a vec3 object, return reflectivity at that point
+  getReflectivity(point) {
+    return this.reflective;
+  }
+
+  // Given a transparency coefficient in the range between 0 and 1 and index of
+  // refraction, set the object's transparency and index of refraction
+  setTransparency(kt, ior) {
+    if (kt < 0 || kt > 1) {
+      throw new RangeError("The argument must be between 0 and 1");
+    }
+    this.transparent = kt;
+    this.ior = ior;
+  }
+
+  // Given a point as a vec3 object, return transparency at that point
+  getTransparency(point) {
+    if (this.opacityMap != null) {
+      const uv = this.getUV(point);
+      return 1 - (this.opacityMap.colorAt(uv[0], uv[1])[0] / 255);
+    }
+    return this.transparent;
+  }
+
+  // Given a color filter for each color channel r, g, b, set it as the object's
+  // color filter
+  setColorFilter(cr, cg, cb) {
+    this.colorFilter = [cr, cg, cb];
+  }
+
+  // Given color values r, g, b, set it as the object's reflected (glow) color
+  setReflectedColor(r, g, b) {
+    this.reflectedColor = [r, g, b];
+  }
+
+  /********** TRANSFORMATION **********/
   // Given an axis to rotate about as a vec3 object and an angle to rotate by in
   // radians, compute rotation matrix and multiply it to transformation matrix
   rotate(axis, angle) {

@@ -4,8 +4,8 @@ import { Ray } from "./Ray.js";
 import * as util from "./utility.js";
 
 export class Triangle {
-  // Given the vertices v0, v1, v2 as vec3 objects and the color values r, g, b,
-  // construct a triangle
+  // Given the vertices v0, v1, v2 as vec3 objects, color values r, g, b, and
+  // whether diffuse, ambient, specular components are on, construct a triangle
   constructor(v0, v1, v2, r, g, b, diffuseOn, ambientOn, specularOn) {
     // vertices
     this.v0 = v0;
@@ -16,99 +16,20 @@ export class Triangle {
     this.ambientPercent = 0.5;
     this.specularColor = [255, 255, 255];
     this.specularLight = [255, 255, 255];
+    this.reflectedColor = null; // glow
     // shading options
     this.diffuseOn = diffuseOn;
     this.ambientOn = ambientOn;
     this.specularOn = specularOn;
     this.shininess = 200; // Phong exponent
-    // transformation
-    this.transform = mat4.create(); // identity matrix
-    this.inverseTransform = mat4.create(); // inverse identity matrix
     // reflection and refraction
     this.reflective = 0;
     this.transparent = 0; // amount of light allowed to go through
     this.ior = 1; // index of refraction
     this.colorFilter = [1, 1, 1]; // Math.exp(-absorbance)
-  }
-
-  /*
-  // TODO: this does not have any effect as triangle has no depth
-  // Given a color filter for each color channel (r, g, b), set it as the
-  // object's color filter
-  setColorFilter(cr, cg, cb) {
-    this.colorFilter = [cr, cg, cb];
-  }
-  */
-
-  // Given a shininess, set it as the object's shininess
-  setShininess(shininess) {
-    this.shininess = shininess;
-  }
-
-  // Given a transparency coefficient in the range between 0 and 1 and index of
-  // refraction, set the object's transparency and index of refraction
-  setTransparency(kt, ior) {
-    if (kt < 0 || kt > 1) {
-      throw new RangeError("The argument must be between 0 and 1");
-    }
-    this.transparent = kt;
-    this.ior = ior;
-  }
-
-  // Given a point as a vec3 object, return transparency at that point
-  getTransparency(point) {
-    return this.transparent;
-  }
-
-  // Given a reflectivity coefficient in the range between 0 and 1, set the
-  // object's reflectivity
-  setReflectivity(ks) {
-    if (ks < 0 || ks > 1) {
-      throw new RangeError("The argument must be between 0 and 1");
-    }
-    this.reflective = ks;
-  }
-
-  // Given a point as a vec3 object, return reflectivity at that point
-  getReflectivity(point) {
-    return this.reflective;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b at
-  // that point
-  colorAt(point) {
-    return this.color;
-  }
-
-  // Given a percentage to tone down the surface color to make an ambient color,
-  // set it as an ambient percent
-  setAmbientPercent(percent) {
-    this.ambientPercent = percent;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // ambient color at that point
-  ambientColorAt(point) {
-    const self = this;
-    return this.color.map(function(x) { return self.ambientPercent * x; });
-  }
-
-  // Given an array of color values r, g, b, set it as the object's specular
-  // color
-  setSpecularColor(r, g, b) {
-    this.specularColor = [r, g, b];
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // specular color at that point
-  specularColorAt(point) {
-    return this.specularColor;
-  }
-
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // specular light at that point
-  specularLightAt(point) {
-    return this.specularLight;
+    // transformation
+    this.transform = mat4.create(); // identity matrix
+    this.inverseTransform = mat4.create(); // inverse identity matrix
   }
 
   // Given a point and ray direction as vec3 objects, return the normal of the
@@ -175,6 +96,95 @@ export class Triangle {
     return t;
   }
 
+  /********** COLOR **********/
+  // Given a point as a vec3 object, return an array of color values r, g, b at
+  // that point
+  colorAt(point) {
+    return this.color;
+  }
+
+  // Given a percentage to tone down the surface color to make an ambient color,
+  // set it as an ambient percent
+  setAmbientPercent(percent) {
+    this.ambientPercent = percent;
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // ambient color at that point
+  ambientColorAt(point) {
+    const self = this;
+    return this.color.map(function(x) { return self.ambientPercent * x; });
+  }
+
+  // Given an array of color values r, g, b, set it as the object's specular
+  // color
+  setSpecularColor(r, g, b) {
+    this.specularColor = [r, g, b];
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // specular color at that point
+  specularColorAt(point) {
+    return this.specularColor;
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // specular light at that point
+  specularLightAt(point) {
+    return this.specularLight;
+  }
+
+  /********** SHADING OPTIONS **********/
+  // Given a shininess, set it as the object's shininess
+  setShininess(shininess) {
+    this.shininess = shininess;
+  }
+
+  /********** REFLECTION/REFRACTION **********/
+  // Given a reflectivity coefficient in the range between 0 and 1, set the
+  // object's reflectivity
+  setReflectivity(ks) {
+    if (ks < 0 || ks > 1) {
+      throw new RangeError("The argument must be between 0 and 1");
+    }
+    this.reflective = ks;
+  }
+
+  // Given a point as a vec3 object, return reflectivity at that point
+  getReflectivity(point) {
+    return this.reflective;
+  }
+
+  // Given a transparency coefficient in the range between 0 and 1 and index of
+  // refraction, set the object's transparency and index of refraction
+  setTransparency(kt, ior) {
+    if (kt < 0 || kt > 1) {
+      throw new RangeError("The argument must be between 0 and 1");
+    }
+    this.transparent = kt;
+    this.ior = ior;
+  }
+
+  // Given a point as a vec3 object, return transparency at that point
+  getTransparency(point) {
+    return this.transparent;
+  }
+
+  // TODO: this does not have any effect as triangle has no depth
+  /*
+  // Given a color filter for each color channel (r, g, b), set it as the
+  // object's color filter
+  setColorFilter(cr, cg, cb) {
+    this.colorFilter = [cr, cg, cb];
+  }
+  */
+
+  // Given color values r, g, b, set it as the object's reflected (glow) color
+  setReflectedColor(r, g, b) {
+    this.reflectedColor = [r, g, b];
+  }
+
+  /********** TRANSFORMATION **********/
   // TODO: repetitive (copied from Sphere.js)
   // Given an axis to rotate about as a vec3 object and an angle to rotate by in
   // radians, compute rotation matrix and multiply it to transformation matrix
