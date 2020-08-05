@@ -19,6 +19,7 @@ export class Sphere {
     this.normalMap = null;
     this.specularMap = null;
     this.opacityMap = null;
+    this.ambientOcclusion = null;
     // shading options
     this.diffuseOn = diffuseOn;
     this.ambientOn = ambientOn;
@@ -115,13 +116,20 @@ export class Sphere {
   // Given a point as a vec3 object, return an array of color values r, g, b of
   // ambient color at that point
   ambientColorAt(point) {
-    // TODO: add case for ambient occlusion map?
+    // compute ambient color by multiplying surface color by ambient percent
     const self = this;
+    let ambientColor = this.color.map(function(x) { return self.ambientPercent * x; });
     if (this.texture != null) {
       const surfaceColor = this.colorAt(point);
-      return surfaceColor.map(function(x) { return self.ambientPercent * x; });
+      ambientColor = surfaceColor.map(function(x) { return self.ambientPercent * x; });
     }
-    return this.color.map(function(x) { return self.ambientPercent * x; });
+    // check if ambient occlusion map exists
+    if (this.ambientOcclusion != null) {
+      const uv = this.getUV(point);
+      const occlusion = this.ambientOcclusion.colorAt(uv[0], uv[1])[0] / 255;
+      ambientColor = ambientColor.map(function(x) { return occlusion * x; });
+    }
+    return ambientColor;
   }
 
   // Given an array of color values r, g, b, set it as the object's specular
@@ -186,6 +194,11 @@ export class Sphere {
     this.opacityMap = opacityMap;
   }
 
+  // Given a Texture object, set the object's ambient occlusion map
+  setAmbientOcclusion(ambientOcclusionMap) {
+    this.ambientOcclusion = ambientOcclusionMap;
+  }
+
   /********** REFLECTION/REFRACTION **********/
   // Given a reflectivity coefficient in the range between 0 and 1, set the
   // object's reflectivity
@@ -215,7 +228,8 @@ export class Sphere {
   getTransparency(point) {
     if (this.opacityMap != null) {
       const uv = this.getUV(point);
-      return 1 - (this.opacityMap.colorAt(uv[0], uv[1])[0] / 255);
+      const opacity = this.opacityMap.colorAt(uv[0], uv[1])[0] / 255;
+      return 1 - opacity;
     }
     return this.transparent;
   }
