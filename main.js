@@ -8,6 +8,7 @@ import * as util from "./utility.js";
 
 const light = new Light(
   vec3.fromValues(0, 3, 5),       // corner
+  //vec3.fromValues(0, 6, 0),       // corner
   vec3.fromValues(0, 0, 0), 4,    // uvecFull, usteps
   vec3.fromValues(0, 0, 0), 4,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
@@ -329,7 +330,7 @@ function subpixelColor(ray, objects, recursionDepth) {
         }
 
         // find reflected color
-        let reflectedColor = closest.reflectedColor;
+        let reflectedColor = closest.glowColor;
         if (reflectedColor == null) {
           // cast reflection ray
           const reflectOrigin = rayFromOutside ? biasedPoint(point, normal,
@@ -450,6 +451,7 @@ async function render() {
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
+  /*
   // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
@@ -489,8 +491,18 @@ async function render() {
   const atmosphere = new Sphere(0, 0, 0, 2.03, 0, 0, 0, false, false, false);
   atmosphere.setTransparency(1, 1);
   atmosphere.setReflectivity(1);
-  atmosphere.setReflectedColor(110, 190, 255);
+  atmosphere.setGlowColor(110, 190, 255);
   objects.push(atmosphere);
+  */
+
+  const v0 = vec3.fromValues(-3, -3, 0);
+  const v1 = vec3.fromValues(3, -3, 0);
+  const v2 = vec3.fromValues(-3, 3, 0);
+  const test = new Triangle(v0, v1, v2, 0, 0, 255, true, true, false);
+  const txtData = await loadTexture(img, canvasT, ctxT, "test/wood.jpg");
+  const texture = new Texture(txtData, canvasT.width, canvasT.height);
+  test.setTexture(texture, [0, 0], [1, 0], [0, 1]);
+  objects.push(test);
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");

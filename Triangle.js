@@ -1,35 +1,18 @@
 // class defining a triangle
-const { vec3, mat4 } = glMatrix;
+const { vec3 } = glMatrix;
 import { Ray } from "./Ray.js";
 import * as util from "./utility.js";
+import { Shape } from "./Shape.js";
 
-export class Triangle {
+export class Triangle extends Shape {
   // Given the vertices v0, v1, v2 as vec3 objects, color values r, g, b, and
   // whether diffuse, ambient, specular components are on, construct a triangle
   constructor(v0, v1, v2, r, g, b, diffuseOn, ambientOn, specularOn) {
+    super(r, g, b, diffuseOn, ambientOn, specularOn);
     // vertices
     this.v0 = v0;
     this.v1 = v1;
     this.v2 = v2;
-    // color
-    this.color = [r, g, b];
-    this.ambientPercent = 0.5;
-    this.specularColor = [255, 255, 255];
-    this.specularLight = [255, 255, 255];
-    this.reflectedColor = null; // glow
-    // shading options
-    this.diffuseOn = diffuseOn;
-    this.ambientOn = ambientOn;
-    this.specularOn = specularOn;
-    this.shininess = 200; // Phong exponent
-    // reflection and refraction
-    this.reflective = 0;
-    this.transparent = 0; // amount of light allowed to go through
-    this.ior = 1; // index of refraction
-    this.colorFilter = [1, 1, 1]; // Math.exp(-absorbance)
-    // transformation
-    this.transform = mat4.create(); // identity matrix
-    this.inverseTransform = mat4.create(); // inverse identity matrix
   }
 
   // Given a point and ray direction as vec3 objects, return the normal of the
@@ -96,147 +79,37 @@ export class Triangle {
     return t;
   }
 
-  /********** COLOR **********/
-  // Given a point as a vec3 object, return an array of color values r, g, b at
-  // that point
-  colorAt(point) {
-    return this.color;
+  // Given a Texture object and texture (u, v) coordinates of each vertex as
+  // an array, set the object's texture
+  setTexture(texture, uv0, uv1, uv2) {
+    super.setTexture(texture);
+    this.uv0 = uv0;
+    this.uv1 = uv1;
+    this.uv2 = uv2;
   }
 
-  // Given a percentage to tone down the surface color to make an ambient color,
-  // set it as an ambient percent
-  setAmbientPercent(percent) {
-    this.ambientPercent = percent;
-  }
+  // Given a point as a vec3 object, compute and return a texture coordinate u,
+  // v as an array
+  getUV(point) {
+    // convert point in cartesian coordinates to barycentric coordinates
+    const v0v1 = vec3.subtract(vec3.create(), this.v1, this.v0);
+    const v0v2 = vec3.subtract(vec3.create(), this.v2, this.v0);
+    const v2v0 = vec3.subtract(vec3.create(), this.v0, this.v2);
+    const v0p = vec3.subtract(vec3.create(), point, this.v0);
+    const v2p = vec3.subtract(vec3.create(), point, this.v2);
 
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // ambient color at that point
-  ambientColorAt(point) {
-    const self = this;
-    return this.color.map(function(x) { return self.ambientPercent * x; });
-  }
+    const n = vec3.cross(vec3.create(), v0v1, v0v2);
+    const nLength = vec3.length(n);
+    const n1 = vec3.cross(vec3.create(), v2v0, v2p);
+    const n2 = vec3.cross(vec3.create(), v0v1, v0p);
 
-  // Given an array of color values r, g, b, set it as the object's specular
-  // color
-  setSpecularColor(r, g, b) {
-    this.specularColor = [r, g, b];
-  }
+    const beta = vec3.dot(n, n1) / (nLength * nLength);
+    const gamma = vec3.dot(n, n2) / (nLength * nLength);
 
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // specular color at that point
-  specularColorAt(point) {
-    return this.specularColor;
-  }
+    // compute uv coordinates
+    const u = this.uv0[0] + beta * (this.uv1[0] - this.uv0[0]) + gamma * (this.uv2[0] - this.uv0[0]);
+    const v = this.uv0[1] + beta * (this.uv1[1] - this.uv0[1]) + gamma * (this.uv2[1] - this.uv0[1]);
 
-  // Given a point as a vec3 object, return an array of color values r, g, b of
-  // specular light at that point
-  specularLightAt(point) {
-    return this.specularLight;
-  }
-
-  /********** SHADING OPTIONS **********/
-  // Given a shininess, set it as the object's shininess
-  setShininess(shininess) {
-    this.shininess = shininess;
-  }
-
-  /********** REFLECTION/REFRACTION **********/
-  // Given a reflectivity coefficient in the range between 0 and 1, set the
-  // object's reflectivity
-  setReflectivity(ks) {
-    if (ks < 0 || ks > 1) {
-      throw new RangeError("The argument must be between 0 and 1");
-    }
-    this.reflective = ks;
-  }
-
-  // Given a point as a vec3 object, return reflectivity at that point
-  getReflectivity(point) {
-    return this.reflective;
-  }
-
-  // Given a transparency coefficient in the range between 0 and 1 and index of
-  // refraction, set the object's transparency and index of refraction
-  setTransparency(kt, ior) {
-    if (kt < 0 || kt > 1) {
-      throw new RangeError("The argument must be between 0 and 1");
-    }
-    this.transparent = kt;
-    this.ior = ior;
-  }
-
-  // Given a point as a vec3 object, return transparency at that point
-  getTransparency(point) {
-    return this.transparent;
-  }
-
-  // TODO: this does not have any effect as triangle has no depth
-  /*
-  // Given a color filter for each color channel (r, g, b), set it as the
-  // object's color filter
-  setColorFilter(cr, cg, cb) {
-    this.colorFilter = [cr, cg, cb];
-  }
-  */
-
-  // Given color values r, g, b, set it as the object's reflected (glow) color
-  setReflectedColor(r, g, b) {
-    this.reflectedColor = [r, g, b];
-  }
-
-  /********** TRANSFORMATION **********/
-  // TODO: repetitive (copied from Sphere.js)
-  // Given an axis to rotate about as a vec3 object and an angle to rotate by in
-  // radians, compute rotation matrix and multiply it to transformation matrix
-  rotate(axis, angle) {
-    const w = vec3.normalize(vec3.create(), axis);
-    let t = vec3.fromValues(0, 0, 1); // any vector not collinear with w
-    if (vec3.equals(w, t)) {
-      t = vec3.fromValues(0, 1, 0);
-    }
-    const u = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), w, t));
-    const v = vec3.cross(vec3.create(), w, u);
-    const objectToWorld = mat4.fromValues(
-      u[0], v[0], w[0], 0,
-      u[1],v[1], w[1], 0,
-      u[2], v[2], w[2], 0,
-      0, 0, 0, 1
-    );
-    const rotationMat = mat4.fromValues(
-      Math.cos(angle), Math.sin(angle), 0, 0,
-      -Math.sin(angle), Math.cos(angle), 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1
-    );
-    const worldToObject = mat4.transpose(mat4.create(), objectToWorld);
-    const result = mat4.multiply(mat4.create(), mat4.multiply(mat4.create(), worldToObject, rotationMat), objectToWorld);
-    mat4.multiply(this.transform, result, this.transform);
-    mat4.multiply(this.inverseTransform, this.inverseTransform, mat4.invert(mat4.create(), result));
-  }
-
-  // Given scaling factors in x, y, z directions, compute scaling matrix and
-  // multiply it to transformation matrix
-  scale(sx, sy, sz) {
-    const scalingMat = mat4.fromValues(
-      sx, 0, 0, 0,
-      0, sy, 0, 0,
-      0, 0, sz, 0,
-      0, 0, 0, 1
-    );
-    mat4.multiply(this.transform, scalingMat, this.transform);
-    mat4.multiply(this.inverseTransform, this.inverseTransform, mat4.invert(mat4.create(), scalingMat));
-  }
-
-  // Given x, y, z to translate by, compute translation matrix and multiply it
-  // to transformation matrix
-  translate(x, y, z) {
-    const translMat = mat4.fromValues(
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      x, y, z, 1
-    );
-    mat4.multiply(this.transform, translMat, this.transform);
-    mat4.multiply(this.inverseTransform, this.inverseTransform, mat4.invert(mat4.create(), translMat));
+    return [u, v];
   }
 }
