@@ -8,28 +8,27 @@ import * as util from "./utility.js";
 
 const light = new Light(
   vec3.fromValues(0, 3, 5),       // corner
-  //vec3.fromValues(0, 6, 0),       // corner
   vec3.fromValues(0, 0, 0), 4,    // uvecFull, usteps
   vec3.fromValues(0, 0, 0), 4,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
 );
+const nx = 500; // canvas width
+const ny = 500; // canvas height
 const l = -2;   // position of the left edge of the image
 const r = 2;    // position of the right edge of the image
 const b = -2;   // position of the bottom edge of the image
 const t = 2;    // position of the top edge of the image
-const nx = 500; // canvas width
-const ny = 500; // canvas height
 const d = 8;    // distance from origin to the image
-const samplingWidth = 4; // = sampling height (NxN)
 const backgroundColor = [255, 255, 255];
+const samplingWidth = 4; // = sampling height (NxN)
 const MAX_RECURSION = 3;
 
 // shading option
 let softShadowOn = false;
 
-// Given an array of objects, Ray object, and how far the ray can go, return the
-// closest object that intersects with the ray
-function closestIntersectObj(objects, ray, tMin) {
+// Given a Ray object, array of objects, and how far the ray can go, return the
+// closest object that intersects with the ray and the t value
+function intersection(ray, objects, tMin) {
   let closest = null;
   for (let k = 0; k < objects.length; k++) {
     const t = objects[k].intersects(ray);
@@ -39,7 +38,7 @@ function closestIntersectObj(objects, ray, tMin) {
       tMin = t;
     }
   }
-  return closest;
+  return { obj: closest, tVal: tMin };
 }
 
 // Given an array of color values r, g, b at the point, normal to that point,
@@ -56,8 +55,7 @@ function computeDiffuse(color, normal, lightDirection) {
 
 // Given an ambient color as an array of color values r, g, b, compute and
 // return ambient component as an array in the range between 0 and 1
-function computeAmbient(ambientColor) {
-  const ambientLightIntensity = [255, 255, 255];
+function computeAmbient(ambientColor, ambientLightIntensity) {
   let ambient = [];
   for (let c = 0; c < 3; c++) {
     ambient[c] = (ambientColor[c] / 255) * (ambientLightIntensity[c] / 255);
@@ -65,13 +63,11 @@ function computeAmbient(ambientColor) {
   return ambient;
 }
 
-// Given a specular color as an array of color values r, g, b, shininess,
-// normal, view direcion, and light direction, compute and return specular
-// component (Phong shading) as an array in the range between 0 and 1
-function computeSpecular(specularColor, specularLightIntensity, shininess,
-                         normal, viewDirection, lightDirection) {
-  const halfVector = vec3.normalize(vec3.create(), vec3.add(vec3.create(),
-      viewDirection, lightDirection));
+// Given a specular color and a specular light as arrays of color values r, g,
+// b, normal, half vector, and shininess, compute and return specular component
+// (Phong shading) as an array in the range between 0 and 1
+function computeSpecular(specularColor, specularLightIntensity, normal,
+                         halfVector, shininess) {
   let specular = [];
   for (let c = 0; c < 3; c++) {
     specular[c] = (specularColor[c] / 255) * (specularLightIntensity[c] / 255) *
@@ -92,7 +88,9 @@ function biasedPoint(point, normal, bias) {
 // TODO: add condition for terminating recursion; if all light is absorbed
 function isInShadow(shadowRay, tLight, lightDirection, objects) {
   // intersects with an object in-between the point and the light
-  const shadowObj = closestIntersectObj(objects, shadowRay, tLight);
+  const intersectData = intersection(shadowRay, objects, tLight);
+  const shadowObj = intersectData.obj;
+  const tVal = intersectData.tVal;
   const inShadow = shadowObj != null;
   let attenuation = [1, 1, 1];
   if (inShadow) {
@@ -107,8 +105,7 @@ function isInShadow(shadowRay, tLight, lightDirection, objects) {
         shadowObj.inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
-    // compute intersection of the (transformed) ray and the untransformed object
-    const tVal = shadowObj.intersects(shadowRay);
+    // find intersection of the (transformed) ray and the untransformed object
     const transPoint = transRay.pointAtParameter(tVal);
 
     // cast a new shadow ray if the object is transparent
@@ -207,7 +204,9 @@ function schlick(rayDirection, normal, ior) {
 // sub-pixel
 function subpixelColor(ray, objects, recursionDepth) {
   // determine the closest intersecting object
-  const closest = closestIntersectObj(objects, ray, Infinity);
+  const intersectData = intersection(ray, objects, Infinity);
+  const closest = intersectData.obj;
+  const tVal = intersectData.tVal;
 
   // compute color of each sub-pixel
   let resultColor = backgroundColor;
@@ -219,8 +218,7 @@ function subpixelColor(ray, objects, recursionDepth) {
         closest.inverseTransform);
     const transRay = new Ray(transOrigin, transDirection);
 
-    // compute intersection of the (transformed) ray and the untransformed object
-    const tVal = closest.intersects(ray);
+    // find intersection of the (transformed) ray and the untransformed object
     const transPoint = transRay.pointAtParameter(tVal);
     const transNormal = closest.normal(transPoint, transRay.direction);
 
@@ -230,16 +228,17 @@ function subpixelColor(ray, objects, recursionDepth) {
     let normal = util.transformDirection(transNormal,
         mat4.transpose(mat4.create(), closest.inverseTransform));
     vec3.normalize(normal, normal);
-    const viewDirection = vec3.normalize(vec3.create(),
-        vec3.subtract(vec3.create(), ray.origin, point));
+    let viewDirection = vec3.subtract(vec3.create(), ray.origin, point);
+    vec3.normalize(viewDirection, viewDirection);
     const color = closest.colorAt(transPoint);
     const ambientColor = closest.ambientColorAt(transPoint);
+    const ambientLight = closest.ambientLightAt(transPoint);
     const specularColor = closest.specularColorAt(transPoint);
     const specularLight = closest.specularLightAt(transPoint);
     const shininess = closest.shininess;
     const overPoint = biasedPoint(point, normal, Math.pow(10, -4)); // for shadow
 
-    const ambient = computeAmbient(ambientColor); // independent of light
+    const ambient = computeAmbient(ambientColor, ambientLight); // independent of light
     let diffuse = [];
     let specular = [];
     let shadow = [];
@@ -252,14 +251,15 @@ function subpixelColor(ray, objects, recursionDepth) {
       for (let uc = 0; uc < light.usteps; uc++) {
         for (let vc = 0; vc < light.vsteps; vc++) {
           const lightPoint = light.pointAt(uc, vc);
-          const lightDirection = vec3.normalize(vec3.create(),
-              vec3.subtract(vec3.create(), lightPoint, point));
+          let lightDirection = vec3.subtract(vec3.create(), lightPoint, point);
+          vec3.normalize(lightDirection, lightDirection);
 
           // intermediates
           const diffuseI = computeDiffuse(color, normal, lightDirection);
+          let halfVector = vec3.add(vec3.create(), viewDirection, lightDirection);
+          vec3.normalize(halfVector, halfVector);
           const specularI = computeSpecular(specularColor, specularLight,
-              shininess, normal, viewDirection, lightDirection);
-          // shadow
+              normal, halfVector, shininess);
           const shadowRayI = new Ray(overPoint, lightDirection);
           const tLightI = vec3.distance(point, lightPoint);
           const shadowI = isInShadow(shadowRayI, tLightI, lightDirection, objects);
@@ -284,13 +284,14 @@ function subpixelColor(ray, objects, recursionDepth) {
       }
     } else {
       // treat area light as point light
-      const lightDirection = vec3.normalize(vec3.create(),
-          vec3.subtract(vec3.create(), light.position, point));
+      const lightDirection = vec3.subtract(vec3.create(), light.position, point);
+      vec3.normalize(lightDirection, lightDirection);
 
       diffuse = computeDiffuse(color, normal, lightDirection);
-      specular = computeSpecular(specularColor, specularLight, shininess,
-          normal, viewDirection, lightDirection);
-      // shadow
+      let halfVector = vec3.add(vec3.create(), viewDirection, lightDirection);
+      vec3.normalize(halfVector, halfVector);
+      specular = computeSpecular(specularColor, specularLight, normal,
+          halfVector, shininess);
       const shadowRay = new Ray(overPoint, lightDirection);
       const tLight = vec3.distance(point, light.position);
       shadow = isInShadow(shadowRay, tLight, lightDirection, objects);
@@ -313,9 +314,7 @@ function subpixelColor(ray, objects, recursionDepth) {
         const rayFromOutside = vec3.dot(ray.direction, normal) < 0;
         let absorb = [1, 1, 1];
         if (!rayFromOutside) { // ray inside the object
-          absorb = closest.colorFilter.map(function(x) {
-            return Math.pow(x, tVal);
-          });
+          absorb = closest.colorFilter.map(x => Math.pow(x, tVal));
         }
 
         // find refracted color
@@ -386,13 +385,6 @@ function subpixelColor(ray, objects, recursionDepth) {
   return resultColor;
 }
 
-// TODO: remove?
-// Given text, add it to the log div
-function addLog(text) {
-    $("#log").append("<span>" + text + "</span><br>");
-    $("#log").scrollTop($("#log").prop("scrollHeight")); // keep scroll at bottom
-}
-
 // Given pixel position i, j, array of objects, and canvas context, color the
 // pixel
 function renderPixel(i, j, objects, ctx) {
@@ -405,7 +397,8 @@ function renderPixel(i, j, objects, ctx) {
       const u = l + (r - l) * (ic + (Math.random() / samplingWidth)) / nx;
       const v = b + (t - b) * (jc + (Math.random() / samplingWidth)) / ny;
       const rayOrigin = vec3.fromValues(0, 0, 15);
-      const rayDirection = vec3.normalize(vec3.create(), vec3.fromValues(u, v, -d));
+      let rayDirection = vec3.fromValues(u, v, -d);
+      vec3.normalize(rayDirection, rayDirection);
       const ray = new Ray(rayOrigin, rayDirection);
 
       // compute and accumulate color of sub-pixels
@@ -451,7 +444,6 @@ async function render() {
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
-  /*
   // earth
   const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
@@ -474,7 +466,7 @@ async function render() {
   const starTexture = new Texture(starData, canvasT.width, canvasT.height);
   const starfield = new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false);
   starfield.setTexture(starTexture);
-  starfield.setAmbientPercent(1);
+  starfield.setAmbientLight(255, 255, 255);
   objects.push(starfield); // TODO: make it bigger
 
   // earth cloud
@@ -493,35 +485,34 @@ async function render() {
   atmosphere.setReflectivity(1);
   atmosphere.setGlowColor(110, 190, 255);
   objects.push(atmosphere);
-  */
-
-  const v0 = vec3.fromValues(-3, -3, 0);
-  const v1 = vec3.fromValues(3, -3, 0);
-  const v2 = vec3.fromValues(-3, 3, 0);
-  const test = new Triangle(v0, v1, v2, 0, 0, 255, true, true, false);
-  const txtData = await loadTexture(img, canvasT, ctxT, "test/wood.jpg");
-  const texture = new Texture(txtData, canvasT.width, canvasT.height);
-  test.setTexture(texture, [0, 0], [1, 0], [0, 1]);
-  objects.push(test);
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
   const ctx = canvas.getContext("2d");
   let pixelNumber = 1;
   let percent = 0;
-  $("#log").text("loading... 0%");
-  for (let i = 0; i < nx; i++) {
-    for (let j = 0; j < ny; j++) {
-      setTimeout(function() {
-        renderPixel(i, j, objects, ctx);
-        if (pixelNumber % ((nx * ny) / 100) == 0) {
-          percent++;
-          $("#log").text("loading... " + percent + "%");
-        }
-        pixelNumber++;
-      }, 0);
+  $("#log").text("Loading... 0%");
+  let promise = new Promise((resolve, reject) => {
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        setTimeout(function() {
+          renderPixel(i, j, objects, ctx);
+          if (pixelNumber % ((nx * ny) / 100) == 0) {
+            percent++;
+            $("#log").text("Loading... " + percent + "%");
+          }
+          pixelNumber++;
+        }, 0);
+      }
     }
-  }
+    setTimeout(function() { resolve("done!"); }, 0);
+  });
+  // set log to empty text 1 second after rendering finishes
+  promise.then((value) => {
+    setTimeout(function() {
+      $("#log").text("");
+    }, 1000);
+  });
 }
 
 $(document).ready(function() {

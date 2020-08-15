@@ -20,13 +20,12 @@ export class Triangle extends Shape {
   normal(point, rayDirection) {
     const v0v1 = vec3.subtract(vec3.create(), this.v1, this.v0);
     const v0v2 = vec3.subtract(vec3.create(), this.v2, this.v0);
-    const normal = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), v0v1,
-        v0v2));
+    let normal = vec3.cross(vec3.create(), v0v1, v0v2);
+    vec3.normalize(normal, normal);
     const negNormal = vec3.negate(vec3.create(), normal);
-    const normalAngle = vec3.angle(normal, vec3.negate(vec3.create(),
-        rayDirection));
-    const negNormalAngle = vec3.angle(negNormal, vec3.negate(vec3.create(),
-        rayDirection));
+    const negRayDirection = vec3.negate(vec3.create(), rayDirection);
+    const normalAngle = vec3.angle(normal, negRayDirection);
+    const negNormalAngle = vec3.angle(negNormal, negRayDirection);
     // regardless of order of vertices, normal will always point towards z+
     if (normalAngle < negNormalAngle) {
       return normal;

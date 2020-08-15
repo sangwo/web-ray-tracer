@@ -7,9 +7,10 @@ export class Shape {
   constructor(r, g, b, diffuseOn, ambientOn, specularOn) {
     // color
     this.color = [r, g, b];
-    this.ambientPercent = 0.5;
+    this.ambientColor = [r, g, b];
+    this.ambientLight = [128, 128, 128];
     this.specularColor = [255, 255, 255];
-    this.specularLight = [255, 255, 255];
+    this.specularLight = [255, 255, 255]; // TODO: should match light color
     this.glowColor = null;
     // textures
     this.texture = null;
@@ -43,29 +44,32 @@ export class Shape {
     return this.color;
   }
 
-  // Given a percentage to tone down the surface color to make an ambient color,
-  // set it as an ambient percent
-  setAmbientPercent(percent) {
-    this.ambientPercent = percent;
-  }
-
   // Given a point as a vec3 object, return an array of color values r, g, b of
   // ambient color at that point
   ambientColorAt(point) {
-    // compute ambient color by multiplying surface color by ambient percent
-    const self = this;
-    let ambientColor = this.color.map(function(x) { return self.ambientPercent * x; });
     if (this.texture != null) {
-      const surfaceColor = this.colorAt(point);
-      ambientColor = surfaceColor.map(function(x) { return self.ambientPercent * x; });
+      const uv = this.getUV(point);
+      return this.texture.colorAt(uv[0], uv[1]);
     }
-    // check if ambient occlusion map exists
+    return this.ambientColor;
+  }
+
+  // Given an array of color values r, g, b, set it as the object's ambient
+  // light
+  setAmbientLight(r, g, b) {
+    this.ambientLight = [r, g, b];
+  }
+
+  // Given a point as a vec3 object, return an array of color values r, g, b of
+  // ambient light at that point
+  ambientLightAt(point) {
+    const ambientLight = this.ambientLight;
     if (this.ambientOcclusion != null) {
       const uv = this.getUV(point);
       const occlusion = this.ambientOcclusion.colorAt(uv[0], uv[1])[0] / 255;
-      ambientColor = ambientColor.map(function(x) { return occlusion * x; });
+      return ambientLight.map(x => occlusion * x);
     }
-    return ambientColor;
+    return ambientLight;
   }
 
   // Given an array of color values r, g, b, set it as the object's specular

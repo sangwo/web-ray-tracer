@@ -5,11 +5,23 @@
     <link rel="stylesheet" type="text/css" href="style.css">
   </head>
   <body>
-    <form>
-      <input id="submit-button" type="submit">
-    </form>
-    <canvas id="rendered-image" width="500" height="500"></canvas>
-    <div id="log"></div>
+    <div id="left">
+      <form>
+        <input id="submit-button" type="submit">
+      </form>
+      <div id="container">
+        <canvas id="rendered-image" width="500" height="500"></canvas>
+        <div id="log"></div>
+      </div>
+    </div>
+
+    <div id="right">
+      <h1>The Pale Blue Dot</h1>
+      <h2>Table of Contents</h2>
+      <ul>
+        <li><a href="#">What is ray tracing</a></li>
+      </ul>
+    </div>
 
     <script type="text/javascript" src="lib/jquery-3.5.1.min.js"></script>
     <script type="text/javascript" src="lib/gl-matrix-min.js"></script>

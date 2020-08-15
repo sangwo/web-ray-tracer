@@ -1,9 +1,35 @@
-#rendered-image {
-  border: 1px solid grey;
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+#left {
+  background-color: #010101;
+  display: inline-block;
+  min-height: 100%;
+  float: left;
+}
+
+#container {
+  position: relative;
+  display: inline-block;
+  width: 500px;
+  height: 500px;
+  margin: 10px;
 }
 
 #log {
-  height: 100px;
-  overflow: scroll;
-  border: 1px solid grey;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: white;
+}
+
+#right {
+  display: inline-block;
 }

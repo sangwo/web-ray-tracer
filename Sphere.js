@@ -23,9 +23,7 @@ export class Sphere extends Shape {
       const uv = this.getUV(point);
 
       // convert rgb to normal in tangent space
-      const rgb = this.normalMap.colorAt(uv[0], uv[1]).map(function(x) {
-        return 2 * x - 255;
-      });
+      const rgb = this.normalMap.colorAt(uv[0], uv[1]).map(x => 2 * x - 255);
       const normalTangentSpace = vec3.fromValues(rgb[0], rgb[1], rgb[2]);
       vec3.normalize(normalTangentSpace, normalTangentSpace);
 
