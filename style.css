@@ -1,35 +1,122 @@
-html {
-  height: 100%;
-}
-
-body {
+body, html {
   margin: 0;
   padding: 0;
-  height: 100%;
-}
-
-#left {
-  background-color: #010101;
-  display: inline-block;
-  min-height: 100%;
-  float: left;
+  height: 100vh;
+  width: 100vw;
+  font-size: 0;
 }
 
 #container {
   position: relative;
   display: inline-block;
-  width: 500px;
-  height: 500px;
-  margin: 10px;
+  background-color: black;
+  color: white;
+  text-shadow: 0 0 5px white;
+  overflow: hidden; /* TODO: temporary */
+}
+
+#text {
+  position: absolute;
+  right: 0;
+  width: 60%;
+  text-align: center;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#title {
+  font-size: 4vw;
+  font-family: 'Orbitron', sans-serif;
+  text-shadow: 0 0 25px #6ebeff;
+  margin-bottom: 10px;
+}
+
+#subtitle {
+  font-size: 1.5vw;
+  font-family: 'Julius Sans One', sans-serif;
+  letter-spacing: 0.5em;
+}
+
+#menu {
+  font-size: 1.5vw;
+  width: 15em;
+  margin: auto;
+  padding: 2em 0;
+  font-family: 'Play', sans-serif;
+  position: relative;
+}
+
+a {
+  border: 1px solid #6ebeff;
+  display: block;
+  text-decoration: none;
+  padding: 1em 0;
+  margin: 1.5em 0;
+  box-shadow: 0 0 10px #6ebeff;
+  cursor: pointer;
+  transition: color 0.4s, box-shadow 0.4s;
+}
+
+a:hover {
+  box-shadow: 0 0 15px #6ebeff, inset 0 0 10px #6ebeff;
+}
+
+a:active {
+  color: lightgrey;
+}
+
+.description {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  left: 0;
+  top: 2em;
+  width: 100%;
+}
+
+.description ul {
+  text-align: left;
+  line-height: 1.8em;
+  list-style-type: decimal-leading-zero;
+}
+
+.description ul ul {
+  list-style-type: upper-roman;
+}
+
+.explore {
+  width: 6em;
+  color: white;
+}
+
+.disabled, .disabled:hover, .disabled:active {
+  text-shadow: none;
+  box-shadow: none;
+  border-color: grey;
+  color: grey;
+  cursor: not-allowed;
+}
+
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.back {
+  transition: color 0.4s, text-shadow 0.4s;
+}
+
+.back:hover {
+  color: lightgrey;
+  text-shadow: 0 0 15px white;
+  cursor: pointer;
 }
 
 #log {
   position: absolute;
   right: 0;
   bottom: 0;
-  color: white;
-}
-
-#right {
-  display: inline-block;
+  font-size: medium;
+  font-family: 'Play', sans-serif;
 }

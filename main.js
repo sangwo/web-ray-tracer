@@ -7,20 +7,21 @@ import { Texture } from "./Texture.js";
 import * as util from "./utility.js";
 
 const light = new Light(
-  vec3.fromValues(0, 3, 5),       // corner
+  vec3.fromValues(4, 4, 10),       // corner
   vec3.fromValues(0, 0, 0), 4,    // uvecFull, usteps
   vec3.fromValues(0, 0, 0), 4,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
 );
-const nx = 500; // canvas width
-const ny = 500; // canvas height
+const nx = document.body.clientWidth; // canvas width
+const ny = document.body.clientHeight; // canvas height
+const imageAspectRatio = nx / ny;
 const l = -2;   // position of the left edge of the image
 const r = 2;    // position of the right edge of the image
 const b = -2;   // position of the bottom edge of the image
 const t = 2;    // position of the top edge of the image
 const d = 8;    // distance from origin to the image
 const backgroundColor = [255, 255, 255];
-const samplingWidth = 4; // = sampling height (NxN)
+const [samplingWidth, samplingHeight] = [4, 4];
 const MAX_RECURSION = 3;
 
 // shading option
@@ -392,11 +393,11 @@ function renderPixel(i, j, objects, ctx) {
 
   // for each sub-pixel, cast a ray and compute color (supersampling)
   for (let ic = i; ic < i + 1; ic += (1 / samplingWidth)) {
-    for (let jc = j; jc < j + 1; jc += (1 / samplingWidth)) {
+    for (let jc = j; jc < j + 1; jc += (1 / samplingHeight)) {
       // cast a ray (random position within the sub-pixel)
-      const u = l + (r - l) * (ic + (Math.random() / samplingWidth)) / nx;
-      const v = b + (t - b) * (jc + (Math.random() / samplingWidth)) / ny;
-      const rayOrigin = vec3.fromValues(0, 0, 15);
+      const u = (l + (r - l) * (ic + (Math.random() / samplingWidth)) / nx) * imageAspectRatio;
+      const v = b + (t - b) * (jc + (Math.random() / samplingHeight)) / ny;
+      const rayOrigin = vec3.fromValues(3, 0, 15);
       let rayDirection = vec3.fromValues(u, v, -d);
       vec3.normalize(rayDirection, rayDirection);
       const ray = new Ray(rayOrigin, rayDirection);
@@ -411,7 +412,7 @@ function renderPixel(i, j, objects, ctx) {
   // compute average color of the pixel
   let averageColor = [];
   for (let c = 0; c < 3; c++) {
-    averageColor[c] = totalColor[c] / (samplingWidth * samplingWidth);
+    averageColor[c] = totalColor[c] / (samplingWidth * samplingHeight);
   }
 
   ctx.fillStyle = "rgb(" + averageColor[0] + ", " + averageColor[1] +
@@ -440,43 +441,53 @@ async function render() {
   let objects = [];
 
   // prepare to load textures
+  $("#log").text("Loading textures...");
   const img = new Image();
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
-  // earth
-  const earthData = await loadTexture(img, canvasT, ctxT, "earth_day.jpg");
+  // change texture files' resolution according to window width
+  let earthFile = "8k_earth_day.jpg";
+  let earthNormalFile = "8k_earth_normal.tiff";
+  let earthSpecularFile = "8k_earth_specular.tiff";
+  let earthCloudFile = "8k_earth_clouds.jpg";
+  let moonFile = "moon.jpg";
+
+  // load textures
+  const earthData = await loadTexture(img, canvasT, ctxT, earthFile);
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  const earthNormalData = await loadTexture(img, canvasT, ctxT, "earth_normal.tiff");
+  const earthNormalData = await loadTexture(img, canvasT, ctxT, earthNormalFile);
   const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
-  const earthSpecularData = await loadTexture(img, canvasT, ctxT, "earth_specular.tiff");
+  const earthSpecularData = await loadTexture(img, canvasT, ctxT, earthSpecularFile);
   const earthSpecular = new Texture(earthSpecularData, canvasT.width, canvasT.height);
+  const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
+  const starTexture = new Texture(starData, canvasT.width, canvasT.height);
+  const cloudData = await loadTexture(img, canvasT, ctxT, earthCloudFile);
+  const cloudTexture = new Texture(cloudData, canvasT.width, canvasT.height);
+  const moonData = await loadTexture(img, canvasT, ctxT, moonFile);
+  const moonTexture = new Texture(moonData, canvasT.width, canvasT.height);
+
+  // earth
   const earth = new Sphere(0, 0, 0, 2, 0, 70, 160, true, true, true);
   earth.setTexture(earthTexture);
   earth.setNormalMap(earthNormal);
   earth.setSpecularMap(earthSpecular);
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
-  earth.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), -Math.PI / 3); // Earth's rotation
   earth.setSpecularColor(150, 150, 150);
   earth.setShininess(50);
   objects.push(earth);
 
   // starfield
-  const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
-  const starTexture = new Texture(starData, canvasT.width, canvasT.height);
   const starfield = new Sphere(0, 0, 0, 20, 0, 0, 0, false, true, false);
   starfield.setTexture(starTexture);
   starfield.setAmbientLight(255, 255, 255);
   objects.push(starfield); // TODO: make it bigger
 
   // earth cloud
-  const cloudData = await loadTexture(img, canvasT, ctxT, "earth_clouds.jpg");
-  const cloudTexture = new Texture(cloudData, canvasT.width, canvasT.height);
   const cloud = new Sphere(0, 0, 0, 2.02, 255, 255, 255, true, true, false);
   cloud.setTexture(cloudTexture);
   cloud.setOpacityMap(cloudTexture);
   cloud.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
-  cloud.rotate(vec3.fromValues(Math.cos(1.16), Math.sin(1.16), 0), -Math.PI / 3); // Earth's rotation
   objects.push(cloud);
 
   // earth atmosphere
@@ -485,6 +496,13 @@ async function render() {
   atmosphere.setReflectivity(1);
   atmosphere.setGlowColor(110, 190, 255);
   objects.push(atmosphere);
+
+  // moon
+  const moon = new Sphere(0, 0, 0, 0.3, 255, 255, 255, true, true, false);
+  moon.setTexture(moonTexture);
+  moon.rotate(vec3.fromValues(0, 1, 0), -Math.PI / 1.8);
+  moon.translate(2, -1, 3);
+  objects.push(moon);
 
   // for each pixel, cast a ray and color the pixel
   const canvas = document.getElementById("rendered-image");
@@ -497,7 +515,7 @@ async function render() {
       for (let j = 0; j < ny; j++) {
         setTimeout(function() {
           renderPixel(i, j, objects, ctx);
-          if (pixelNumber % ((nx * ny) / 100) == 0) {
+          if (pixelNumber % Math.floor((nx * ny) / 100) == 0) {
             percent++;
             $("#log").text("Loading... " + percent + "%");
           }
@@ -516,15 +534,37 @@ async function render() {
 }
 
 $(document).ready(function() {
-  // TODO: for debugging
-  $("#submit-button").on("click", function() {
-    try {
-      render();
-    } catch(err) {
-      //alert(err);
-      console.log(err);
-    } finally {
-      return false;
-    }
+  // set width and height of canvas
+  const canvas = document.getElementById("rendered-image");
+  canvas.width = nx;
+  canvas.height = ny;
+
+  // choose a stage
+  $("#stages a").on("click", function() {
+    const stage = $(this).attr("class");
+    $("#stages").fadeTo(500, 0, function() {
+      $("#stages").css("visibility", "hidden");
+    });
+    $(".description." + stage).css("visibility", "visible");
+    $(".description." + stage).fadeTo(400, 1);
   });
+
+  // back button
+  $(".back").on("click", function() {
+    $(".description").fadeTo(500, 0, function() {
+      $(".description").css("visibility", "hidden");
+    });
+    $("#stages").css("visibility", "visible");
+    $("#stages").fadeTo(400, 1);
+  });
+
+  // render
+  try {
+    render();
+  } catch(err) {
+    //alert(err);
+    console.log(err);
+  } finally {
+    return false;
+  }
 });
