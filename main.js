@@ -448,16 +448,16 @@ async function render() {
 
   // change texture files' resolution according to window width
   let earthFile = "8k_earth_day.jpg";
-  let earthNormalFile = "8k_earth_normal.tiff";
-  let earthSpecularFile = "8k_earth_specular.tiff";
+  let earthNormalFile = "8k_earth_normal.png";
+  let earthSpecularFile = "8k_earth_specular.png";
   let earthCloudFile = "8k_earth_clouds.jpg";
   let moonFile = "moon.jpg";
 
   // load textures
   const earthData = await loadTexture(img, canvasT, ctxT, earthFile);
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  const earthNormalData = await loadTexture(img, canvasT, ctxT, earthNormalFile);
-  const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
+  //const earthNormalData = await loadTexture(img, canvasT, ctxT, earthNormalFile);
+  //const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
   const earthSpecularData = await loadTexture(img, canvasT, ctxT, earthSpecularFile);
   const earthSpecular = new Texture(earthSpecularData, canvasT.width, canvasT.height);
   const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
@@ -470,7 +470,7 @@ async function render() {
   // earth
   const earth = new Sphere(0, 0, 0, 2, 0, 70, 160, true, true, true);
   earth.setTexture(earthTexture);
-  earth.setNormalMap(earthNormal);
+  //earth.setNormalMap(earthNormal);
   earth.setSpecularMap(earthSpecular);
   earth.rotate(vec3.fromValues(0, 0, 1), -0.41); // 23.5 degrees tilted
   earth.setSpecularColor(150, 150, 150);
