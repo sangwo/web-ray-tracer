@@ -17,10 +17,10 @@ This tutorial is written by a student who had no former knowledge of computer gr
 - [Generating rays](docs/02_generating_rays.md)
 - [Ray-sphere intersection](docs/03_ray-sphere_intersection.md)
 - [Shading](docs/04_shading.md)
-    - Diffuse (Lambertian)
-    - Ambient
-    - Specular (Phong)
-    - Shadows
+    - [Diffuse (Lambertian)](docs/04_shading.md#diffuse-lambertian)
+    - [Ambient](docs/04_shading.md#ambient)
+    - [Specular (Phong)](docs/04_shading.md#specular-phong)
+    - [Shadows](docs/04_shading.md#shadows)
 - [Anti-aliasing](docs/05_anti-aliasing.md)
 
 ### Textures
