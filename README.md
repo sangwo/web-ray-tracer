@@ -1,6 +1,8 @@
 # Ray Tracing Tutorial
 For those who want to learn about ray tracing from scratch and would love to get a taste of computer graphics. Learn with me!
 
+![rendered earth](imgs/rendered_earth.png)
+
 This tutorial is written by a student who had no former knowledge of computer graphics. Please feel free to make corrections, give feedback, or add resources!
 
 ## Prerequisites
