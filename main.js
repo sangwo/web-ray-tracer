@@ -7,7 +7,7 @@ import { Texture } from "./Texture.js";
 import * as util from "./utility.js";
 
 const light = new Light(
-  vec3.fromValues(4, 4, 10),       // corner
+  vec3.fromValues(4, 4, 10),      // corner
   vec3.fromValues(0, 0, 0), 4,    // uvecFull, usteps
   vec3.fromValues(0, 0, 0), 4,    // vvecFull, vsteps
   255, 255, 255                   // r, g, b
@@ -23,9 +23,7 @@ const d = 8;    // distance from origin to the image
 const backgroundColor = [255, 255, 255];
 const [samplingWidth, samplingHeight] = [4, 4];
 const MAX_RECURSION = 3;
-
-// shading option
-let softShadowOn = false;
+const softShadowOn = false; // shading option
 
 // Given a Ray object, array of objects, and how far the ray can go, return the
 // closest object that intersects with the ray and the t value
@@ -446,25 +444,18 @@ async function render() {
   const canvasT = document.createElement("canvas");
   const ctxT = canvasT.getContext("2d");
 
-  // change texture files' resolution according to window width
-  let earthFile = "8k_earth_day.jpg";
-  let earthNormalFile = "8k_earth_normal.png";
-  let earthSpecularFile = "8k_earth_specular.png";
-  let earthCloudFile = "8k_earth_clouds.jpg";
-  let moonFile = "moon.jpg";
-
   // load textures
-  const earthData = await loadTexture(img, canvasT, ctxT, earthFile);
+  const earthData = await loadTexture(img, canvasT, ctxT, "8k_earth_day.jpg");
   const earthTexture = new Texture(earthData, canvasT.width, canvasT.height);
-  //const earthNormalData = await loadTexture(img, canvasT, ctxT, earthNormalFile);
+  //const earthNormalData = await loadTexture(img, canvasT, ctxT, "8k_earth_normal.png");
   //const earthNormal = new Texture(earthNormalData, canvasT.width, canvasT.height);
-  const earthSpecularData = await loadTexture(img, canvasT, ctxT, earthSpecularFile);
+  const earthSpecularData = await loadTexture(img, canvasT, ctxT, "8k_earth_specular.png");
   const earthSpecular = new Texture(earthSpecularData, canvasT.width, canvasT.height);
   const starData = await loadTexture(img, canvasT, ctxT, "8k_stars_milky_way.jpg");
   const starTexture = new Texture(starData, canvasT.width, canvasT.height);
-  const cloudData = await loadTexture(img, canvasT, ctxT, earthCloudFile);
+  const cloudData = await loadTexture(img, canvasT, ctxT, "8k_earth_clouds.jpg");
   const cloudTexture = new Texture(cloudData, canvasT.width, canvasT.height);
-  const moonData = await loadTexture(img, canvasT, ctxT, moonFile);
+  const moonData = await loadTexture(img, canvasT, ctxT, "moon.jpg");
   const moonTexture = new Texture(moonData, canvasT.width, canvasT.height);
 
   // earth

@@ -1,0 +1,21 @@
+# Further topics
+Here are some ray tracing topics you can further learn about:
+- More shapes
+    - Triangle
+    - Triangle mesh
+    - Disk
+    - Cylinder
+    - Cube
+    - Curve
+- More lights
+    - Directional light
+    - Area light
+    - Objects as lights (eg. sphere light)
+- Materials (dielectric/conductor)
+- Soft shadows
+- Displacement mapping
+- Global illumination
+- Path tracing
+- Camera manipulation (move around)
+- Animation
+- Optimization and acceleration
